@@ -7,7 +7,7 @@
 执行exe文件安装
 
 ##添加所需的dll文件
-运行mosquitto.exe，有可能会需要libeay32.dll、ssleay32.dll、pthreadvc2.dll（可以在[originaldll](www.http://originaldll.com/)下载）。 
+运行mosquitto.exe，有可能会需要libeay32.dll、ssleay32.dll、pthreadvc2.dll（可以在[originaldll](http://www.originaldll.com/)下载）。 
 
 执行下列步骤：  
 * 将这些文件拷贝到：  __c:\Windows\SysWOW64\__目录中
