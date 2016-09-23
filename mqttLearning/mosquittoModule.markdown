@@ -2,7 +2,7 @@
 #概述
 __libmosquitto__ 作为 __mosquitto__ 开源代码的一部分，主要用来实现 __MQTT__ 协议栈和数据包通讯功能。
   
-下面将对__libmosquitto__包含的部分模块进行分析。  
+下面将对__libmosquitto__包含的 __mosquitto__ 模块进行分析。  
 
 #mosquitto_internal.h
 __mosquitto_internal.h__ 中定义了使用的数据结构。包含下列内容：
