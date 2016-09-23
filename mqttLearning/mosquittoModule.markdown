@@ -69,10 +69,10 @@ int mosquitto_lib_version(int *major, int *minor, int *revision)
 
 name|decription|
 ----|----------|
-返回值|int,返回完整的版本号|
 major|如果不为NULL，赋值为major version|
 minor|如果不为NULL，赋值为ninor version|
 revision|如果不为NULL，赋值为revision version|
+返回值|int,返回完整的版本号|
 
 ###4、初始化
 ```c
@@ -156,7 +156,7 @@ name|description|
 id|客户端id。如果为NULL，会生成一个随机id。如果为NULL，clean_session必须为 true|
 clean_session|如果为true，通知broker在断开连接时清除所有的消息及订阅；如果为false，则通知broker在断开连接时保留消息及订阅。需要注意，客户端在断开时应该永远不丢弃所持有的输出消息 |
 userdata|用户指针，传递给回调函数的变量|
-返回值|如果成功，返回一个mosquitto结构体；如果失败，可以查询错误码来获得具体原因:ENOMEM，内存溢出；EINVAL，传入了无效的变量
+返回值|成功，返回一个mosquitto结构体；<br>内存溢出，ENOMEM；<br>无效的变量，返回EINVAL，
 
 ###7、销毁客户端实例
 ```c
@@ -283,7 +283,7 @@ mosq|有效的客户端实例|
 id|参考 mosquitto_new方法
 clean_session|参考 mosquitto_new方法
 obj|参考 mosquitto_new方法
-返回值|成功，返回MOSQ_ERR_SUCCESS；参数无效，返回MOSQ_ERR_INVAL；内存溢出，返回MOSQ_ERR_NOMEM|
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM|
 
 ###9、设置will
 ```c
@@ -304,8 +304,315 @@ payloadlen|载荷长度，长度在0-268,435,455之间
 payload|载荷，如果payloadlen长度大于0，则必须指向一块有效的内存
 qos|用于will的服务质量，value=0，1，2
 retain|true，令will是一个要保留的消息（？待确定）
-返回值|成功，返回MOSQ_ERR_SUCCESS；输入参数无效，返回MOSQ_ERR_INVAL；内存溢出，返回MOSQ_ERR_NOMEM；payloadlen过大，返回MOSQ_ERR_PAYLOAD_SIZE
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>输入参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM；<br>payloadlen过大，返回MOSQ_ERR_PAYLOAD_SIZE
 
+###10、清除will
+```c
+int mosquitto_will_clear(struct mosquitto *mosq)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+	return _mosquitto_will_clear(mosq);
+}
+```
+* 清除设置的will，必须在__mosquitto_connect__之前调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL
+
+###11、用户名、密码设置
+```c
+int mosquitto_username_pw_set(struct mosquitto *mosq, const char *username, const char *password)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	if(mosq->username){
+		_mosquitto_free(mosq->username);
+		mosq->username = NULL;
+	}
+	if(mosq->password){
+		_mosquitto_free(mosq->password);
+		mosq->password = NULL;
+	}
+
+	if(username){
+		mosq->username = _mosquitto_strdup(username);
+		if(!mosq->username) return MOSQ_ERR_NOMEM;
+		if(password){
+			mosq->password = _mosquitto_strdup(password);
+			if(!mosq->password){
+				_mosquitto_free(mosq->username);
+				mosq->username = NULL;
+				return MOSQ_ERR_NOMEM;
+			}
+		}
+	}
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 为一个客户端实例配置用户名和密码，仅在broker实现MQTT V3.1协议时使用。默认情况下，不会发送用户名和密码。必须在__mosquitto_connect__之前调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例
+username|字符串形式的用户名，如果为空，则忽略password，关闭身份验证
+password|字符串形式的密码，当置为NULL，并且用户名有效时，仅发送用户名
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM
+
+###12、连接
+```c
+int mosquitto_connect(struct mosquitto *mosq, const char *host, int port, int keepalive)
+{
+	return mosquitto_connect_bind(mosq, host, port, keepalive, NULL);
+}
+```
+* 连接到broker
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+host|broker的主机名或者ip地址
+port|broker的网络端口，通常为1883
+keepalive|当没有数据交互时，broker发送PING message的时间间隔
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###13、连接（扩展）
+```c
+int mosquitto_connect_bind(struct mosquitto *mosq, const char *host, int port, int keepalive, const char *bind_address)
+{
+	int rc;
+	rc = _mosquitto_connect_init(mosq, host, port, keepalive, bind_address);
+	if(rc) return rc;
+
+	pthread_mutex_lock(&mosq->state_mutex);
+	mosq->state = mosq_cs_new;
+	pthread_mutex_unlock(&mosq->state_mutex);
+
+	return _mosquitto_reconnect(mosq, true);
+}
+```
+* 连接到broker，通过添加(bind _ address)变量扩展了__mosquitto_connect__函数。当需要通过特殊的接口来限制网络连接时，使用此函数。
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+host|broker的主机名或者ip地址
+port|broker的网络端口，通常为1883
+keepalive|当没有数据交互时，broker发送PING message的时间间隔
+bind_address|本地网络提供绑定的主机名或ip地址
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###14、异步连接
+```c
+int mosquitto_connect_async(struct mosquitto *mosq, const char *host, int port, int keepalive)
+{
+	return mosquitto_connect_bind_async(mosq, host, port, keepalive, NULL);
+}
+```
+* 非阻塞形式连接broker，如果通过异步方式连接broker，客户端必须使用__mosquitto_loop_start__。如果要是用__mosquitto_loop__，则必须使用__mosquitto_connect__
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+host|broker的主机名或者ip地址
+port|broker的网络端口，通常为1883
+keepalive|当没有数据交互时，broker发送PING message的时间间隔
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###15、异步连接（扩展）
+```c
+int mosquitto_connect_bind_async(struct mosquitto *mosq, const char *host, int port, int keepalive, const char *bind_address)
+{
+	int rc = _mosquitto_connect_init(mosq, host, port, keepalive, bind_address);
+	if(rc) return rc;
+
+	pthread_mutex_lock(&mosq->state_mutex);
+	mosq->state = mosq_cs_connect_async;
+	pthread_mutex_unlock(&mosq->state_mutex);
+
+	return _mosquitto_reconnect(mosq, false);
+}
+```
+* 非阻塞形式连接broker，如果通过异步方式连接broker，客户端必须使用__mosquitto_loop_start__。如果要是用__mosquitto_loop__，则必须使用__mosquitto_connect__
+* 通过添加(bind _ address)变量扩展了__mosquitto_connect_async__函数。当需要通过特殊的接口来限制网络连接时，使用此函数
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+host|broker的主机名或者ip地址
+port|broker的网络端口，通常为1883
+keepalive|当没有数据交互时，broker发送PING message的时间间隔
+bind_address|本地网络提供绑定的主机名或ip地址
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###16、重新连接
+```c
+int mosquitto_reconnect(struct mosquitto *mosq)
+{
+	return _mosquitto_reconnect(mosq, true);
+}
+```
+* 重新连接broker
+* 提供了一种简单的方式在连接断开后重新连接broker的函数，使用在__mosquitto_connect__中提供的参数进行连接，不允许在__mosquitto_connect__之前调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###17、异步重新连接
+```c
+int mosquitto_reconnect_async(struct mosquitto *mosq)
+{
+	return _mosquitto_reconnect(mosq, false);
+}
+```
+* 异步方式重新连接broker
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###18、断开连接
+```c
+int mosquitto_disconnect(struct mosquitto *mosq)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	pthread_mutex_lock(&mosq->state_mutex);
+	mosq->state = mosq_cs_disconnecting;
+	pthread_mutex_unlock(&mosq->state_mutex);
+
+	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
+	return _mosquitto_send_disconnect(mosq);
+}
+```
+* 断开与broker的连接
+* 参数说明
+
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###19、发布消息
+```c
+int mosquitto_publish(struct mosquitto *mosq, int *mid, const char *topic, int payloadlen, const void *payload, int qos, bool retain)
+{
+	struct mosquitto_message_all *message;
+	uint16_t local_mid;
+	int queue_status;
+
+	if(!mosq || !topic || qos<0 || qos>2) return MOSQ_ERR_INVAL;
+	if(STREMPTY(topic)) return MOSQ_ERR_INVAL;
+	if(payloadlen < 0 || payloadlen > MQTT_MAX_PAYLOAD) return MOSQ_ERR_PAYLOAD_SIZE;
+
+	if(mosquitto_pub_topic_check(topic) != MOSQ_ERR_SUCCESS){
+		return MOSQ_ERR_INVAL;
+	}
+
+	local_mid = _mosquitto_mid_generate(mosq);
+	if(mid){
+		*mid = local_mid;
+	}
+
+	if(qos == 0){
+		return _mosquitto_send_publish(mosq, local_mid, topic, payloadlen, payload, qos, retain, false);
+	}else{
+		message = _mosquitto_calloc(1, sizeof(struct mosquitto_message_all));
+		if(!message) return MOSQ_ERR_NOMEM;
+
+		message->next = NULL;
+		message->timestamp = mosquitto_time();
+		message->msg.mid = local_mid;
+		message->msg.topic = _mosquitto_strdup(topic);
+		if(!message->msg.topic){
+			_mosquitto_message_cleanup(&message);
+			return MOSQ_ERR_NOMEM;
+		}
+		if(payloadlen){
+			message->msg.payloadlen = payloadlen;
+			message->msg.payload = _mosquitto_malloc(payloadlen*sizeof(uint8_t));
+			if(!message->msg.payload){
+				_mosquitto_message_cleanup(&message);
+				return MOSQ_ERR_NOMEM;
+			}
+			memcpy(message->msg.payload, payload, payloadlen*sizeof(uint8_t));
+		}else{
+			message->msg.payloadlen = 0;
+			message->msg.payload = NULL;
+		}
+		message->msg.qos = qos;
+		message->msg.retain = retain;
+		message->dup = false;
+
+		pthread_mutex_lock(&mosq->out_message_mutex);
+		queue_status = _mosquitto_message_queue(mosq, message, mosq_md_out);
+		if(queue_status == 0){
+			if(qos == 1){
+				message->state = mosq_ms_wait_for_puback;
+			}else if(qos == 2){
+				message->state = mosq_ms_wait_for_pubrec;
+			}
+			pthread_mutex_unlock(&mosq->out_message_mutex);
+			return _mosquitto_send_publish(mosq, message->msg.mid, message->msg.topic, message->msg.payloadlen, message->msg.payload, message->msg.qos, message->msg.retain, message->dup);
+		}else{
+			message->state = mosq_ms_invalid;
+			pthread_mutex_unlock(&mosq->out_message_mutex);
+			return MOSQ_ERR_SUCCESS;
+		}
+	}
+}
+```
+* 在给定topic上发布消息
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
+topic|发布消息的topic
+payloadlen|载荷长度，长度在0-268,435,455之间
+payload|载荷，如果payloadlen长度大于0，则必须指向一块有效的内存
+qos|用服务质量，value=0，1，2
+retain|true，保留消息（？待确定）
+返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN <br>与broker的通信中协议错误，返回MOSQ_ERR_PROTOCOL <br>payloadlen过大，返回MOSQ_ERR_PAYLOAD_SIZE
+
+###20、订阅消息
+```c
+int mosquitto_subscribe(struct mosquitto *mosq, int *mid, const char *sub, int qos)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
+
+	if(mosquitto_sub_topic_check(sub)) return MOSQ_ERR_INVAL;
+
+	return _mosquitto_send_subscribe(mosq, mid, sub, qos);
+}
+```
+* 订阅一个topic
+* 参数说明
+
+name|description|
+---|------------|
+mosq|一个有效的客户端实例|
+mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
+topic|发布消息的topic
+sub|订阅模式
+qos|订阅要求的服务质量
+返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN 
+ 
 
  <br>
 <font color="red" size="5">……</font>  
