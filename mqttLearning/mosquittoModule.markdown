@@ -591,14 +591,14 @@ retain|true，保留消息（？待确定）
 
 ###20、订阅消息
 ```c
-int mosquitto_subscribe(struct mosquitto *mosq, int *mid, const char *sub, int qos)
+int mosquitto_subscribe(struct mosquitto *mosqq, int *mid, const char *sub, int qos)
 {
-	if(!mosq) return MOSQ_ERR_INVAL;
-	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
+	if(!mosqq) return MOSQ_ERR_INVAL;
+	if(mosqq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
 
 	if(mosquitto_sub_topic_check(sub)) return MOSQ_ERR_INVAL;
 
-	return _mosquitto_send_subscribe(mosq, mid, sub, qos);
+	return _mosquitto_send_subscribe(mosqq, mid, sub, qos);
 }
 ```
 * 订阅一个topic
@@ -606,13 +606,419 @@ int mosquitto_subscribe(struct mosquitto *mosq, int *mid, const char *sub, int q
 
 name|description|
 ---|------------|
-mosq|一个有效的客户端实例|
+mosqq |一个有效的客户端实例|
 mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
 topic|发布消息的topic
-sub|订阅模式
-qos|订阅要求的服务质量
+sub |订阅模式
+qos |订阅要求的服务质量
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN 
  
+###21、取消订阅
+```c
+int mosquitto_unsubscribe(struct mosquitto *mosq, int *mid, const char *sub)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
+
+	if(mosquitto_sub_topic_check(sub)) return MOSQ_ERR_INVAL;
+
+	return _mosquitto_send_unsubscribe(mosq, mid, sub);
+}
+```
+* 取消订阅
+* 参数说明
+
+name|description|
+---|------------|
+mosq |一个有效的客户端实例|
+mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与取消订阅后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息|
+sub|取消定于的模式
+返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN
+
+###22、消息拷贝(在message_mosq.c中实现)
+```c
+int mosquitto_message_copy(struct mosquitto_message *dst, const struct mosquitto_message *src)
+{
+	if(!dst || !src) return MOSQ_ERR_INVAL;
+
+	dst->mid = src->mid;
+	dst->topic = _mosquitto_strdup(src->topic);
+	if(!dst->topic) return MOSQ_ERR_NOMEM;
+	dst->qos = src->qos;
+	dst->retain = src->retain;
+	if(src->payloadlen){
+		dst->payload = _mosquitto_malloc(src->payloadlen);
+		if(!dst->payload){
+			_mosquitto_free(dst->topic);
+			return MOSQ_ERR_NOMEM;
+		}
+		memcpy(dst->payload, src->payload, src->payloadlen);
+		dst->payloadlen = src->payloadlen;
+	}else{
+		dst->payloadlen = 0;
+		dst->payload = NULL;
+	}
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 拷贝一条消息内容到另一条消息中。可以用于在 __on_message()__ 回调中保持消息。
+* 参数说明
+
+name|description|
+---|------------|
+dst|目的消息
+src|源消息
+返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM
+
+###23、释放消息(在message_mosq.c中实现)
+```c
+void mosquitto_message_free(struct mosquitto_message **message)
+{
+	struct mosquitto_message *msg;
+
+	if(!message || !*message) return;
+
+	msg = *message;
+
+	if(msg->topic) _mosquitto_free(msg->topic);
+	if(msg->payload) _mosquitto_free(msg->payload);
+	_mosquitto_free(msg);
+}
+```
+* 释放一条mosquitto_message消息
+* 参数说明
+
+name|description|
+---|------------|
+message|指向一条待释放的消息
+
+###24、启动循环
+```c
+int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
+{
+#ifdef HAVE_PSELECT
+	struct timespec local_timeout;
+#else
+	struct timeval local_timeout;
+#endif
+	fd_set readfds, writefds;
+	int fdcount;
+	int rc;
+	char pairbuf;
+	int maxfd = 0;
+
+	if(!mosq || max_packets < 1) return MOSQ_ERR_INVAL;
+#ifndef WIN32
+	if(mosq->sock >= FD_SETSIZE || mosq->sockpairR >= FD_SETSIZE){
+		return MOSQ_ERR_INVAL;
+	}
+#endif
+
+	FD_ZERO(&readfds);
+	FD_ZERO(&writefds);
+	if(mosq->sock != INVALID_SOCKET){
+		maxfd = mosq->sock;
+		FD_SET(mosq->sock, &readfds);
+		pthread_mutex_lock(&mosq->current_out_packet_mutex);
+		pthread_mutex_lock(&mosq->out_packet_mutex);
+		if(mosq->out_packet || mosq->current_out_packet){
+			FD_SET(mosq->sock, &writefds);
+		}
+#ifdef WITH_TLS
+		if(mosq->ssl){
+			if(mosq->want_write){
+				FD_SET(mosq->sock, &writefds);
+			}else if(mosq->want_connect){
+				/* Remove possible FD_SET from above, we don't want to check
+				 * for writing if we are still connecting, unless want_write is
+				 * definitely set. The presence of outgoing packets does not
+				 * matter yet. */
+				FD_CLR(mosq->sock, &writefds);
+			}
+		}
+#endif
+		pthread_mutex_unlock(&mosq->out_packet_mutex);
+		pthread_mutex_unlock(&mosq->current_out_packet_mutex);
+	}else{
+#ifdef WITH_SRV
+		if(mosq->achan){
+			pthread_mutex_lock(&mosq->state_mutex);
+			if(mosq->state == mosq_cs_connect_srv){
+				rc = ares_fds(mosq->achan, &readfds, &writefds);
+				if(rc > maxfd){
+					maxfd = rc;
+				}
+			}else{
+				pthread_mutex_unlock(&mosq->state_mutex);
+				return MOSQ_ERR_NO_CONN;
+			}
+			pthread_mutex_unlock(&mosq->state_mutex);
+		}
+#else
+		return MOSQ_ERR_NO_CONN;
+#endif
+	}
+	if(mosq->sockpairR != INVALID_SOCKET){
+		/* sockpairR is used to break out of select() before the timeout, on a
+		 * call to publish() etc. */
+		FD_SET(mosq->sockpairR, &readfds);
+		if(mosq->sockpairR > maxfd){
+			maxfd = mosq->sockpairR;
+		}
+	}
+
+	if(timeout >= 0){
+		local_timeout.tv_sec = timeout/1000;
+#ifdef HAVE_PSELECT
+		local_timeout.tv_nsec = (timeout-local_timeout.tv_sec*1000)*1e6;
+#else
+		local_timeout.tv_usec = (timeout-local_timeout.tv_sec*1000)*1000;
+#endif
+	}else{
+		local_timeout.tv_sec = 1;
+#ifdef HAVE_PSELECT
+		local_timeout.tv_nsec = 0;
+#else
+		local_timeout.tv_usec = 0;
+#endif
+	}
+
+#ifdef HAVE_PSELECT
+	fdcount = pselect(maxfd+1, &readfds, &writefds, NULL, &local_timeout, NULL);
+#else
+	fdcount = select(maxfd+1, &readfds, &writefds, NULL, &local_timeout);
+#endif
+	if(fdcount == -1){
+#ifdef WIN32
+		errno = WSAGetLastError();
+#endif
+		if(errno == EINTR){
+			return MOSQ_ERR_SUCCESS;
+		}else{
+			return MOSQ_ERR_ERRNO;
+		}
+	}else{
+		if(mosq->sock != INVALID_SOCKET){
+			if(FD_ISSET(mosq->sock, &readfds)){
+#ifdef WITH_TLS
+				if(mosq->want_connect){
+					rc = mosquitto__socket_connect_tls(mosq);
+					if(rc) return rc;
+				}else
+#endif
+				{
+					do{
+						rc = mosquitto_loop_read(mosq, max_packets);
+						if(rc || mosq->sock == INVALID_SOCKET){
+							return rc;
+						}
+					}while(SSL_DATA_PENDING(mosq));
+				}
+			}
+			if(mosq->sockpairR != INVALID_SOCKET && FD_ISSET(mosq->sockpairR, &readfds)){
+#ifndef WIN32
+				if(read(mosq->sockpairR, &pairbuf, 1) == 0){
+				}
+#else
+				recv(mosq->sockpairR, &pairbuf, 1, 0);
+#endif
+				/* Fake write possible, to stimulate output write even though
+				 * we didn't ask for it, because at that point the publish or
+				 * other command wasn't present. */
+				FD_SET(mosq->sock, &writefds);
+			}
+			if(FD_ISSET(mosq->sock, &writefds)){
+#ifdef WITH_TLS
+				if(mosq->want_connect){
+					rc = mosquitto__socket_connect_tls(mosq);
+					if(rc) return rc;
+				}else
+#endif
+				{
+					rc = mosquitto_loop_write(mosq, max_packets);
+					if(rc || mosq->sock == INVALID_SOCKET){
+						return rc;
+					}
+				}
+			}
+		}
+#ifdef WITH_SRV
+		if(mosq->achan){
+			ares_process(mosq->achan, &readfds, &writefds);
+		}
+#endif
+	}
+	return mosquitto_loop_misc(mosq);
+}
+```
+* 客户端的网络工作主循环。必须周期性的调用此函数来保证客户端和broker之间的通信。如果流入数据已经就绪，将会被处理。通常会在调用发布消息时立刻将消息发出。此函数会尝试发送任何已经保留的输出消息，包括一部分用于QoS>0的消息流中的命令（？待确定）
+* 可以在客户端所拥有的线程中开启循环，使用的方法是__mosquitto_loop_start__
+* 此方法使用select方式进行轮询监控socket，如果想要整合mosquitto客户端和自己的select方法，可以是用__mosquitto_socket__，__mosquitto_loop_read__，__mosquitto_loop_write__和__mosquitto_loop_misc__
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+timeout|select的超时时间，如果为0，则立刻调用，默认为__1000毫秒__
+max_packets|未使用，为了兼容性应该设置为__1__
+返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>内存溢出，返回MOSQ_ERR_NOMEM<br>与broker未连接，返回MOSQ_ERR_NO_CONN<br>连接失效，返回MOSQ_ERR_CONN_LOST<br>与broker通信中，协议错误，返回MOSQ_ERR_PROTOCOL<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###25、启动循环（永久）
+```c
+int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
+{
+	int run = 1;
+	int rc;
+	unsigned int reconnects = 0;
+	unsigned long reconnect_delay;
+
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	if(mosq->state == mosq_cs_connect_async){
+		mosquitto_reconnect(mosq);
+	}
+
+	while(run){
+		do{
+			rc = mosquitto_loop(mosq, timeout, max_packets);
+			if (reconnects !=0 && rc == MOSQ_ERR_SUCCESS){
+				reconnects = 0;
+			}
+		}while(run && rc == MOSQ_ERR_SUCCESS);
+		/* Quit after fatal errors. */
+		switch(rc){
+			case MOSQ_ERR_NOMEM:
+			case MOSQ_ERR_PROTOCOL:
+			case MOSQ_ERR_INVAL:
+			case MOSQ_ERR_NOT_FOUND:
+			case MOSQ_ERR_TLS:
+			case MOSQ_ERR_PAYLOAD_SIZE:
+			case MOSQ_ERR_NOT_SUPPORTED:
+			case MOSQ_ERR_AUTH:
+			case MOSQ_ERR_ACL_DENIED:
+			case MOSQ_ERR_UNKNOWN:
+			case MOSQ_ERR_EAI:
+			case MOSQ_ERR_PROXY:
+				return rc;
+			case MOSQ_ERR_ERRNO:
+				break;
+		}
+		if(errno == EPROTO){
+			return rc;
+		}
+		do{
+			rc = MOSQ_ERR_SUCCESS;
+			pthread_mutex_lock(&mosq->state_mutex);
+			if(mosq->state == mosq_cs_disconnecting){
+				run = 0;
+				pthread_mutex_unlock(&mosq->state_mutex);
+			}else{
+				pthread_mutex_unlock(&mosq->state_mutex);
+
+				if(mosq->reconnect_delay > 0 && mosq->reconnect_exponential_backoff){
+					reconnect_delay = mosq->reconnect_delay*reconnects*reconnects;
+				}else{
+					reconnect_delay = mosq->reconnect_delay;
+				}
+
+				if(reconnect_delay > mosq->reconnect_delay_max){
+					reconnect_delay = mosq->reconnect_delay_max;
+				}else{
+					reconnects++;
+				}
+
+#ifdef WIN32
+				Sleep(reconnect_delay*1000);
+#else
+				sleep(reconnect_delay);
+#endif
+
+				pthread_mutex_lock(&mosq->state_mutex);
+				if(mosq->state == mosq_cs_disconnecting){
+					run = 0;
+					pthread_mutex_unlock(&mosq->state_mutex);
+				}else{
+					pthread_mutex_unlock(&mosq->state_mutex);
+					rc = mosquitto_reconnect(mosq);
+				}
+			}
+		}while(run && rc != MOSQ_ERR_SUCCESS);
+	}
+	return rc;
+}
+```
+* 当在程序中，仅仅需要启动MQTT客户端时，可以使用此方法。启动一个永久阻塞的循环
+* 当连接失效时，会重新连接，调用__mosquitto_disconnect()__可以结束并返回
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+timeout|select的超时时间，如果为0，则立刻调用，默认为__1000毫秒__
+max_packets|未使用，为了兼容性应该设置为__1__
+返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>内存溢出，返回MOSQ_ERR_NOMEM<br>与broker未连接，返回MOSQ_ERR_NO_CONN<br>连接失效，返回MOSQ_ERR_CONN_LOST<br>与broker通信中，协议错误，返回MOSQ_ERR_PROTOCOL<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###26、启动循环（线程，在thread_mosq.c中实现）
+```c
+int mosquitto_loop_start(struct mosquitto *mosq)
+{
+#ifdef WITH_THREADING
+	if(!mosq || mosq->threaded) return MOSQ_ERR_INVAL;
+
+	mosq->threaded = true;
+	pthread_create(&mosq->thread_id, NULL, _mosquitto_thread_main, mosq);
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+#endif
+}
+```
+* 每调用一次此函数，将开启一个新的线程去处理网络业务。为用户提供一种重复调用__mosquitto_loop__的替代方法
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>线程不支持，返回MOSQ_ERR_NOT_SUPPORTED
+
+###27、停止循环（在thread_mosq.c中实现）
+```c
+int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
+{
+#ifdef WITH_THREADING
+#  ifndef WITH_BROKER
+	char sockpair_data = 0;
+#  endif
+
+	if(!mosq || !mosq->threaded) return MOSQ_ERR_INVAL;
+
+
+	/* Write a single byte to sockpairW (connected to sockpairR) to break out
+	 * of select() if in threaded mode. */
+	if(mosq->sockpairW != INVALID_SOCKET){
+#ifndef WIN32
+		if(write(mosq->sockpairW, &sockpair_data, 1)){
+		}
+#else
+		send(mosq->sockpairW, &sockpair_data, 1, 0);
+#endif
+	}
+	
+	if(force){
+		pthread_cancel(mosq->thread_id);
+	}
+	pthread_join(mosq->thread_id, NULL);
+	mosq->thread_id = pthread_self();
+	mosq->threaded = false;
+
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+#endif
+}
+```
+* 
+
 
  <br>
-<font color="red" size="5">……</font>  
+<font color="red" size="5">……</font>  ·
