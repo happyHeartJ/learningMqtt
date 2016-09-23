@@ -4,25 +4,6 @@ __libmosquitto__ 作为 __mosquitto__ 开源代码的一部分，主要用来实
   
 下面将对__libmosquitto__包含的 __mosquitto__ 模块进行分析。  
 
-#mosquitto_internal.h
-__mosquitto_internal.h__ 中定义了使用的数据结构。包含下列内容：
-* enum枚举值
-* struct结构体
-* 函数指针
-* 全局变量
-
-```c
-#ifdef WITH_BROKER
-#  include "uthash.h"
-struct mosquitto_client_msg;
-#endif
-```
-* 宏定义
-* 其他变量定义
-* 头文件包含
-
-  <br>
-<font color="red" size="5">代码详细注解待添加</font>  
 #mosquitto.h
 
 __mosquitto.h__中定义了外部调用的接口，利用__mosquitto__进行开发时，需要包含__mosquitto.h__文件。 包含下列内容：  
