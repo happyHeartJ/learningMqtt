@@ -54,7 +54,7 @@ payloadlen|负载长度|
 qos|服务质量，value=0，1，2
 retain|是否保留，value=0，1|
 
-###3、版本接口
+###3、mosquitto_lib_version（版本接口）
 ```c
 int mosquitto_lib_version(int *major, int *minor, int *revision)
 {
@@ -74,7 +74,7 @@ minor|如果不为NULL，赋值为ninor version|
 revision|如果不为NULL，赋值为revision version|
 返回值|int,返回完整的版本号|
 
-###4、初始化
+###4、mosquitto_lib_init（初始化）
 ```c
 int mosquitto_lib_init(void)
 {
@@ -96,7 +96,7 @@ int mosquitto_lib_init(void)
 * 该方法不是__线程安全__的
 * 始终返回__MOSQ_ERR_SUCCESS__
 
-###5、资源回收
+###5、mosquitto_lib_cleanup（资源回收）
 ```c
 int mosquitto_lib_cleanup(void)
 {
@@ -108,7 +108,7 @@ int mosquitto_lib_cleanup(void)
 * 释放分配的资源
 * 始终返回__MOSQ_ERR_SUCCESS__
 
-###6、创建客户端实例
+###6、mosquitto_new（创建客户端实例）
 ```c
 struct mosquitto *mosquitto_new(const char *id, bool clean_session, void *userdata)
 {
@@ -158,7 +158,7 @@ clean_session|如果为true，通知broker在断开连接时清除所有的消�
 userdata|用户指针，传递给回调函数的变量|
 返回值|成功，返回一个mosquitto结构体；<br>内存溢出，ENOMEM；<br>无效的变量，返回EINVAL，
 
-###7、销毁客户端实例
+###7、mosquitto_destroy（销毁客户端实例）
 ```c
 void mosquitto_destroy(struct mosquitto *mosq)
 {
@@ -175,7 +175,7 @@ name|description|
 ---|------------|
 mosq|要释放的实例
 
-###8、重新初始化
+###8、mosquitto_reinitialise（重新初始化）
 ```c
 int mosquitto_reinitialise(struct mosquitto *mosq, const char *id, bool clean_session, void *userdata)
 {
@@ -285,7 +285,7 @@ clean_session|参考 mosquitto_new方法
 obj|参考 mosquitto_new方法
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM|
 
-###9、设置will
+###9、mosquitto_will_set（设置will）
 ```c
 int mosquitto_will_set(struct mosquitto *mosq, const char *topic, int payloadlen, const void *payload, int qos, bool retain)
 {
@@ -306,7 +306,7 @@ qos|用于will的服务质量，value=0，1，2
 retain|true，令will是一个要保留的消息（？待确定）
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>输入参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM；<br>payloadlen过大，返回MOSQ_ERR_PAYLOAD_SIZE
 
-###10、清除will
+###10、mosquitto_will_clear（清除will）
 ```c
 int mosquitto_will_clear(struct mosquitto *mosq)
 {
@@ -322,7 +322,7 @@ name|description|
 mosq|一个有效的客户端实例
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL
 
-###11、用户名、密码设置
+###11、mosquitto_username_pw_set（用户名、密码设置）
 ```c
 int mosquitto_username_pw_set(struct mosquitto *mosq, const char *username, const char *password)
 {
@@ -362,7 +362,7 @@ username|字符串形式的用户名，如果为空，则忽略password，关闭
 password|字符串形式的密码，当置为NULL，并且用户名有效时，仅发送用户名
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>内存溢出，返回MOSQ_ERR_NOMEM
 
-###12、连接
+###12、mosquitto_connect（连接）
 ```c
 int mosquitto_connect(struct mosquitto *mosq, const char *host, int port, int keepalive)
 {
@@ -380,7 +380,7 @@ port|broker的网络端口，通常为1883
 keepalive|当没有数据交互时，broker发送PING message的时间间隔
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###13、连接（扩展）
+###13、mosquitto_connect_bind（连接（扩展））
 ```c
 int mosquitto_connect_bind(struct mosquitto *mosq, const char *host, int port, int keepalive, const char *bind_address)
 {
@@ -407,7 +407,7 @@ keepalive|当没有数据交互时，broker发送PING message的时间间隔
 bind_address|本地网络提供绑定的主机名或ip地址
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###14、异步连接
+###14、mosquitto_connect_async（异步连接）
 ```c
 int mosquitto_connect_async(struct mosquitto *mosq, const char *host, int port, int keepalive)
 {
@@ -425,7 +425,7 @@ port|broker的网络端口，通常为1883
 keepalive|当没有数据交互时，broker发送PING message的时间间隔
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###15、异步连接（扩展）
+###15、mosquitto_connect_bind_async（异步连接（扩展））
 ```c
 int mosquitto_connect_bind_async(struct mosquitto *mosq, const char *host, int port, int keepalive, const char *bind_address)
 {
@@ -452,7 +452,7 @@ keepalive|当没有数据交互时，broker发送PING message的时间间隔
 bind_address|本地网络提供绑定的主机名或ip地址
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###16、重新连接
+###16、mosquitto_reconnect（重新连接）
 ```c
 int mosquitto_reconnect(struct mosquitto *mosq)
 {
@@ -468,7 +468,7 @@ name|description|
 mosq|一个有效的客户端实例|
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###17、异步重新连接
+###17、mosquitto_reconnect_async（异步重新连接）
 ```c
 int mosquitto_reconnect_async(struct mosquitto *mosq)
 {
@@ -483,7 +483,7 @@ name|description|
 mosq|一个有效的客户端实例|
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###18、断开连接
+###18、mosquitto_disconnect（断开连接）
 ```c
 int mosquitto_disconnect(struct mosquitto *mosq)
 {
@@ -506,7 +506,7 @@ name|description|
 mosq|一个有效的客户端实例|
 返回值|成功，返回MOSQ_ERR_SUCCESS；<br>参数无效，返回MOSQ_ERR_INVAL；<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###19、发布消息
+###19、mosquitto_publish（发布消息）
 ```c
 int mosquitto_publish(struct mosquitto *mosq, int *mid, const char *topic, int payloadlen, const void *payload, int qos, bool retain)
 {
@@ -589,7 +589,7 @@ qos|用服务质量，value=0，1，2
 retain|true，保留消息（？待确定）
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN <br>与broker的通信中协议错误，返回MOSQ_ERR_PROTOCOL <br>payloadlen过大，返回MOSQ_ERR_PAYLOAD_SIZE
 
-###20、订阅消息
+###20、mosquitto_subscribe（订阅消息）
 ```c
 int mosquitto_subscribe(struct mosquitto *mosqq, int *mid, const char *sub, int qos)
 {
@@ -613,7 +613,7 @@ sub |订阅模式
 qos |订阅要求的服务质量
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN 
  
-###21、取消订阅
+###21、mosquitto_unsubscribe（取消订阅）
 ```c
 int mosquitto_unsubscribe(struct mosquitto *mosq, int *mid, const char *sub)
 {
@@ -635,7 +635,7 @@ mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<
 sub|取消定于的模式
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN
 
-###22、消息拷贝(在message_mosq.c中实现)
+###22、mosquitto_message_copy（消息拷贝(在message_mosq.c中实现)）
 ```c
 int mosquitto_message_copy(struct mosquitto_message *dst, const struct mosquitto_message *src)
 {
@@ -670,7 +670,7 @@ dst|目的消息
 src|源消息
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM
 
-###23、释放消息(在message_mosq.c中实现)
+###23、mosquitto_message_free（释放消息(在message_mosq.c中实现)）
 ```c
 void mosquitto_message_free(struct mosquitto_message **message)
 {
@@ -692,7 +692,7 @@ name|description|
 ---|------------|
 message|指向一条待释放的消息
 
-###24、启动循环
+###24、mosquitto_loop（启动循环）
 ```c
 int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 {
@@ -863,7 +863,7 @@ timeout|select的超时时间，如果为0，则立刻调用，默认为__1000�
 max_packets|未使用，为了兼容性应该设置为__1__
 返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>内存溢出，返回MOSQ_ERR_NOMEM<br>与broker未连接，返回MOSQ_ERR_NO_CONN<br>连接失效，返回MOSQ_ERR_CONN_LOST<br>与broker通信中，协议错误，返回MOSQ_ERR_PROTOCOL<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###25、启动循环（永久）
+###25、mosquitto_loop_forever（启动循环（永久））
 ```c
 int mosquitto_loop_forever(struct mosquitto *mosq, int timeout, int max_packets)
 {
@@ -958,7 +958,7 @@ timeout|select的超时时间，如果为0，则立刻调用，默认为__1000�
 max_packets|未使用，为了兼容性应该设置为__1__
 返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>内存溢出，返回MOSQ_ERR_NOMEM<br>与broker未连接，返回MOSQ_ERR_NO_CONN<br>连接失效，返回MOSQ_ERR_CONN_LOST<br>与broker通信中，协议错误，返回MOSQ_ERR_PROTOCOL<br>系统调用失败，返回MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###26、启动循环（线程，在thread_mosq.c中实现）
+###26、mosquitto_loop_start（启动循环（线程，在thread_mosq.c中实现））
 ```c
 int mosquitto_loop_start(struct mosquitto *mosq)
 {
@@ -981,7 +981,7 @@ name|description|
 mosq|客户端实例
 返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>线程不支持，返回MOSQ_ERR_NOT_SUPPORTED
 
-###27、停止循环（在thread_mosq.c中实现）
+###27、mosquitto_loop_stop（停止循环（在thread_mosq.c中实现））
 ```c
 int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 {
@@ -1026,7 +1026,7 @@ mosq|客户端实例
 force|true，强行结束线程<br>false，必须先调用__mosquitto_disconnect__
 返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>线程不支持，返回MOSQ_ERR_NOT_SUPPORTED
 
-###28、socket
+###28、mosquitto_socket
 ```c
 int mosquitto_socket(struct mosquitto *mosq)
 {
@@ -1042,7 +1042,7 @@ name|description|
 mosq|客户端实例
 返回值|成功，返回socket<br>失败，返回-1
 
-###29、循环：读
+###29、mosquitto_loop_read（循环：读）
 ```c
 int mosquitto_loop_read(struct mosquitto *mosq, int max_packets)
 {
@@ -1088,7 +1088,7 @@ mosq|客户端实例
 max_packets|未使用，为了兼容性应该设置为__1__
 返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>内存溢出，返回 MOSQ_ERR_NOMEM<br>客户端没有连接broker，返回 MOSQ_ERR_NO_CONN<br>与broker的连接失效，返回 MOSQ_ERR_CONN_LOST<br>与broker的通信中，协议错误，返回 MOSQ_ERR_PROTOCOL<br>系统调用失败，返回 MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###30、循环：写
+###30、mosquitto_loop_write（循环：写）
 ```c
 int mosquitto_loop_write(struct mosquitto *mosq, int max_packets)
 {
@@ -1127,7 +1127,7 @@ mosq|客户端实例
 max_packets|未使用，为了兼容性应该设置为__1__
 返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>内存溢出，返回 MOSQ_ERR_NOMEM<br>客户端没有连接broker，返回 MOSQ_ERR_NO_CONN<br>与broker的连接失效，返回 MOSQ_ERR_CONN_LOST<br>与broker的通信中，协议错误，返回 MOSQ_ERR_PROTOCOL<br>系统调用失败，返回 MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
 
-###31、循环（混合）
+###31、mosquitto_loop_misc（循环（混合））
 ```c
 int mosquitto_loop_misc(struct mosquitto *mosq)
 {
@@ -1220,7 +1220,7 @@ mosq|客户端实例
 threaded|如果你的程序使用了多线程，设置为__true__，否则为__false__
 返回值|*
 
-###34、设置参数（mosquitto_opts_set）
+###34、mosquitto_opts_set（设置参数）
 ```c
 int mosquitto_opts_set(struct mosquitto *mosq, enum mosq_opt_t option, void *value)
 {
@@ -1759,7 +1759,7 @@ name|description|
 mosq|mosquitto实例
 obj|用户指针，会作为参数传递给任意一个回调函数使用
 
-###49、mosquitto_socks5_set
+###49、mosquitto_socks5_set（在socks_mosq.c中实现）
 ```c
 int mosquitto_socks5_set(struct mosquitto *mosq, const char *host, int port, const char *username, const char *password)
 {
@@ -1893,48 +1893,301 @@ name|description|
 connack_code|MQTT连接结果
 返回值|描述结果的字符串
 
+###52、mosquitto_sub_topic_tokenise
+```c
+int mosquitto_sub_topic_tokenise(const char *subtopic, char ***topics, int *count)
+{
+	int len;
+	int hier_count = 1;
+	int start, stop;
+	int hier;
+	int tlen;
+	int i, j;
 
+	if(!subtopic || !topics || !count) return MOSQ_ERR_INVAL;
 
+	len = strlen(subtopic);
 
+	for(i=0; i<len; i++){
+		if(subtopic[i] == '/'){
+			if(i > len-1){
+				/* Separator at end of line */
+			}else{
+				hier_count++;
+			}
+		}
+	}
 
+	(*topics) = _mosquitto_calloc(hier_count, sizeof(char *));
+	if(!(*topics)) return MOSQ_ERR_NOMEM;
 
+	start = 0;
+	stop = 0;
+	hier = 0;
 
+	for(i=0; i<len+1; i++){
+		if(subtopic[i] == '/' || subtopic[i] == '\0'){
+			stop = i;
+			if(start != stop){
+				tlen = stop-start + 1;
+				(*topics)[hier] = _mosquitto_calloc(tlen, sizeof(char));
+				if(!(*topics)[hier]){
+					for(i=0; i<hier_count; i++){
+						if((*topics)[hier]){
+							_mosquitto_free((*topics)[hier]);
+						}
+					}
+					_mosquitto_free((*topics));
+					return MOSQ_ERR_NOMEM;
+				}
+				for(j=start; j<stop; j++){
+					(*topics)[hier][j-start] = subtopic[j];
+				}
+			}
+			start = i+1;
+			hier++;
+		}
+	}
 
+	*count = hier_count;
 
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 将topic或者订阅字符串放入数组中来表示层级
+* 参数说明
 
+name|description|
+---|------------|
+subtopic|要分级的subscription/topic
+topics|字符串数组，用来保存每一级的内容
+count|保存级别数量
 
+例如，
+```
+For example:
 
+ subtopic: "a/deep/topic/hierarchy"
+   Would result in:
+   topics[0] = "a"
+   topics[1] = "deep"
+   topics[2] = "topic"
+   topics[3] = "hierarchy"
+ 
+  and:
+ 
+  subtopic: "/a/deep/topic/hierarchy/"
+ 
+  Would result in:
+ 
+  topics[0] = NULL
+  topics[1] = "a"
+  topics[2] = "deep"
+  topics[3] = "topic"
+  topics[4] = "hierarchy"
+ 
+  Parameters:
+ 	subtopic - the subscription/topic to tokenise
+ 	topics -   a pointer to store the array of strings
+ 	count -    an int pointer to store the number of items in the topics array.
+ 
+  Returns:
+ 	MOSQ_ERR_SUCCESS - on success
+  	MOSQ_ERR_NOMEM -   if an out of memory condition occurred.
+  Example:
+ 
+  > char **topics;
+  > int topic_count;
+  > int i;
+  > 
+  > mosquitto_sub_topic_tokenise("$SYS/broker/uptime", &topics, &topic_count);
+  >
+  > for(i=0; i<token_count; i++){
+  >     printf("%d: %s\n", i, topics[i]);
+  > }
+```
 
+###53、mosquitto_sub_topic_tokens_free
+```c
+int mosquitto_sub_topic_tokens_free(char ***topics, int count)
+{
+	int i;
 
+	if(!topics || !(*topics) || count<1) return MOSQ_ERR_INVAL;
 
+	for(i=0; i<count; i++){
+		if((*topics)[i]) _mosquitto_free((*topics)[i]);
+	}
+	_mosquitto_free(*topics);
 
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 释放__mosquitto_sub_topic_tokenise__分配的内存
+* 参数说明
 
+name|description|
+---|------------|
+topics|字符串数组
+count|字符串数组中元素个数
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL
 
+###54、mosquitto_topic_matches_sub（在util_mosq.c中实现）
+```c
+int mosquitto_topic_matches_sub(const char *sub, const char *topic, bool *result)
+{
+	int slen, tlen;
+	int spos, tpos;
+	bool multilevel_wildcard = false;
 
+	if(!sub || !topic || !result) return MOSQ_ERR_INVAL;
 
+	slen = strlen(sub);
+	tlen = strlen(topic);
 
+	if(slen && tlen){
+		if((sub[0] == '$' && topic[0] != '$')
+				|| (topic[0] == '$' && sub[0] != '$')){
 
+			*result = false;
+			return MOSQ_ERR_SUCCESS;
+		}
+	}
 
+	spos = 0;
+	tpos = 0;
 
+	while(spos < slen && tpos < tlen){
+		if(sub[spos] == topic[tpos]){
+			if(tpos == tlen-1){
+				/* Check for e.g. foo matching foo/# */
+				if(spos == slen-3 
+						&& sub[spos+1] == '/'
+						&& sub[spos+2] == '#'){
+					*result = true;
+					multilevel_wildcard = true;
+					return MOSQ_ERR_SUCCESS;
+				}
+			}
+			spos++;
+			tpos++;
+			if(spos == slen && tpos == tlen){
+				*result = true;
+				return MOSQ_ERR_SUCCESS;
+			}else if(tpos == tlen && spos == slen-1 && sub[spos] == '+'){
+				spos++;
+				*result = true;
+				return MOSQ_ERR_SUCCESS;
+			}
+		}else{
+			if(sub[spos] == '+'){
+				spos++;
+				while(tpos < tlen && topic[tpos] != '/'){
+					tpos++;
+				}
+				if(tpos == tlen && spos == slen){
+					*result = true;
+					return MOSQ_ERR_SUCCESS;
+				}
+			}else if(sub[spos] == '#'){
+				multilevel_wildcard = true;
+				if(spos+1 != slen){
+					*result = false;
+					return MOSQ_ERR_SUCCESS;
+				}else{
+					*result = true;
+					return MOSQ_ERR_SUCCESS;
+				}
+			}else{
+				*result = false;
+				return MOSQ_ERR_SUCCESS;
+			}
+		}
+	}
+	if(multilevel_wildcard == false && (tpos < tlen || spos < slen)){
+		*result = false;
+	}
 
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 检测topic是否和订阅匹配
+* 参数说明
 
+name|description|
+---|------------|
+sub|订阅字符串，用于和topic比对
+topic|检测的topic
+result|true，如果匹配
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>内存溢出，返回 MOSQ_ERR_NOMEM
 
+例如，
+```
+ foo/bar would match the subscription foo/# or +/bar
+ non/matching would not match the subscription non/+/+
+```
 
+###55、mosquitto_pub_topic_check（在util_mosq.c中实现）
+```c
+int mosquitto_pub_topic_check(const char *str)
+{
+	int len = 0;
+	while(str && str[0]){
+		if(str[0] == '+' || str[0] == '#'){
+			return MOSQ_ERR_INVAL;
+		}
+		len++;
+		str = &str[1];
+	}
+	if(len > 65535) return MOSQ_ERR_INVAL;
 
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 检测要发布的topic是否有效
+* 会检测‘+’和‘#’，检测长度
+* 在__mosquitto_publish__和__mosquitto_will_set__已经执行了此方法，不需要在它们之前直接调用此方法
+* 参数说明
 
+name|description|
+---|------------|
+topic|需要检测的topic
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>如果包含'+'或者'#'，或者长度过大，返回 MOSQ_ERR_INVAL
 
+###56、mosquitto_sub_topic_check
+```c
+int mosquitto_sub_topic_check(const char *str)
+{
+	char c = '\0';
+	int len = 0;
+	while(str && str[0]){
+		if(str[0] == '+'){
+			if((c != '\0' && c != '/') || (str[1] != '\0' && str[1] != '/')){
+				return MOSQ_ERR_INVAL;
+			}
+		}else if(str[0] == '#'){
+			if((c != '\0' && c != '/')  || str[1] != '\0'){
+				return MOSQ_ERR_INVAL;
+			}
+		}
+		len++;
+		c = str[0];
+		str = &str[1];
+	}
+	if(len > 65535) return MOSQ_ERR_INVAL;
 
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 检测一个订阅是否有效
+* 会检测‘+’和‘#’，检测它们是否在有效的位置，检测长度,例如
 
+```foo/#/bar, foo/+bar or foo/bar#```
+* 在__mosquitto_subscribe__和__mosquitto_unsubscribe__中已经调用，不需要在它们之前直接调用此方法
+* 参数说明
 
+name|description|
+---|------------|
+str|要检测的订阅
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>如果包含'+'或者'#'，或者长度过大，返回 MOSQ_ERR_INVAL
 
-
-
-
-
-
-
-
-
-
- <br>
-<font color="red" size="5">……</font>  ·
