@@ -4,6 +4,8 @@ __libmosquitto__ 作为 __mosquitto__ 开源代码的一部分，主要用来实
   
 下面将对__libmosquitto__包含的 __mosquitto__ 模块进行分析。  
 
+----
+
 #mosquitto.h
 
 __mosquitto.h__中定义了外部调用的接口，利用__mosquitto__进行开发时，需要包含__mosquitto.h__文件。 包含下列内容：  
