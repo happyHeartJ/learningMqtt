@@ -47,7 +47,7 @@ struct mosquitto_message{
   
 name |description|
 ----|----|
-mid | * |
+mid | 消息id |
 topic|话题名称|
 payload|负载内容|
 payloadlen|负载长度|
@@ -1017,7 +1017,923 @@ int mosquitto_loop_stop(struct mosquitto *mosq, bool force)
 #endif
 }
 ```
-* 
+* 停止使用__mosquitto_loop_start__ 启动的的网络线程。这个函数会阻塞，直到网络线程停止。为了是网络线程终止，必须先调用__mosquitto_disconnect__或者将参数__force__设置为__true__
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+force|true，强行结束线程<br>false，必须先调用__mosquitto_disconnect__
+返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL<br>线程不支持，返回MOSQ_ERR_NOT_SUPPORTED
+
+###28、socket
+```c
+int mosquitto_socket(struct mosquitto *mosq)
+{
+	if(!mosq) return INVALID_SOCKET;
+	return mosq->sock;
+}
+```
+* 返回一个mosquitto实例的socket句柄。如果希望在select调用中包含一个mosquitto实例的话，这个方法很有用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+返回值|成功，返回socket<br>失败，返回-1
+
+###29、循环：读
+```c
+int mosquitto_loop_read(struct mosquitto *mosq, int max_packets)
+{
+	int rc;
+	int i;
+	if(max_packets < 1) return MOSQ_ERR_INVAL;
+
+	pthread_mutex_lock(&mosq->out_message_mutex);
+	max_packets = mosq->out_queue_len;
+	pthread_mutex_unlock(&mosq->out_message_mutex);
+
+	pthread_mutex_lock(&mosq->in_message_mutex);
+	max_packets += mosq->in_queue_len;
+	pthread_mutex_unlock(&mosq->in_message_mutex);
+
+	if(max_packets < 1) max_packets = 1;
+	/* Queue len here tells us how many messages are awaiting processing and
+	 * have QoS > 0. We should try to deal with that many in this loop in order
+	 * to keep up. */
+	for(i=0; i<max_packets; i++){
+#ifdef WITH_SOCKS
+		if(mosq->socks5_host){
+			rc = mosquitto__socks5_read(mosq);
+		}else
+#endif
+		{
+			rc = _mosquitto_packet_read(mosq);
+		}
+		if(rc || errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
+			return _mosquitto_loop_rc_handle(mosq, rc);
+		}
+	}
+	return rc;
+}
+```
+* 执行网络读的动作
+* 仅仅用于不使用__mosquitto_loop()__，并且自己监控客户端socket时
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+max_packets|未使用，为了兼容性应该设置为__1__
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>内存溢出，返回 MOSQ_ERR_NOMEM<br>客户端没有连接broker，返回 MOSQ_ERR_NO_CONN<br>与broker的连接失效，返回 MOSQ_ERR_CONN_LOST<br>与broker的通信中，协议错误，返回 MOSQ_ERR_PROTOCOL<br>系统调用失败，返回 MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###30、循环：写
+```c
+int mosquitto_loop_write(struct mosquitto *mosq, int max_packets)
+{
+	int rc;
+	int i;
+	if(max_packets < 1) return MOSQ_ERR_INVAL;
+
+	pthread_mutex_lock(&mosq->out_message_mutex);
+	max_packets = mosq->out_queue_len;
+	pthread_mutex_unlock(&mosq->out_message_mutex);
+
+	pthread_mutex_lock(&mosq->in_message_mutex);
+	max_packets += mosq->in_queue_len;
+	pthread_mutex_unlock(&mosq->in_message_mutex);
+
+	if(max_packets < 1) max_packets = 1;
+	/* Queue len here tells us how many messages are awaiting processing and
+	 * have QoS > 0. We should try to deal with that many in this loop in order
+	 * to keep up. */
+	for(i=0; i<max_packets; i++){
+		rc = _mosquitto_packet_write(mosq);
+		if(rc || errno == EAGAIN || errno == COMPAT_EWOULDBLOCK){
+			return _mosquitto_loop_rc_handle(mosq, rc);
+		}
+	}
+	return rc;
+}
+```
+* 执行网络的写操作
+* 仅仅用于不使用__mosquitto_loop()__，并且自己监控客户端socket时
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+max_packets|未使用，为了兼容性应该设置为__1__
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>内存溢出，返回 MOSQ_ERR_NOMEM<br>客户端没有连接broker，返回 MOSQ_ERR_NO_CONN<br>与broker的连接失效，返回 MOSQ_ERR_CONN_LOST<br>与broker的通信中，协议错误，返回 MOSQ_ERR_PROTOCOL<br>系统调用失败，返回 MOSQ_ERR_ERRNO，可以查看详细的错误码获得错误信息
+
+###31、循环（混合）
+```c
+int mosquitto_loop_misc(struct mosquitto *mosq)
+{
+	time_t now;
+	int rc;
+
+	if(!mosq) return MOSQ_ERR_INVAL;
+	if(mosq->sock == INVALID_SOCKET) return MOSQ_ERR_NO_CONN;
+
+	_mosquitto_check_keepalive(mosq);
+	now = mosquitto_time();
+	if(mosq->last_retry_check+1 < now){
+		_mosquitto_message_retry_check(mosq);
+		mosq->last_retry_check = now;
+	}
+	if(mosq->ping_t && now - mosq->ping_t >= mosq->keepalive){
+		/* mosq->ping_t != 0 means we are waiting for a pingresp.
+		 * This hasn't happened in the keepalive time so we should disconnect.
+		 */
+		_mosquitto_socket_close(mosq);
+		pthread_mutex_lock(&mosq->state_mutex);
+		if(mosq->state == mosq_cs_disconnecting){
+			rc = MOSQ_ERR_SUCCESS;
+		}else{
+			rc = 1;
+		}
+		pthread_mutex_unlock(&mosq->state_mutex);
+		pthread_mutex_lock(&mosq->callback_mutex);
+		if(mosq->on_disconnect){
+			mosq->in_callback = true;
+			mosq->on_disconnect(mosq, mosq->userdata, rc);
+			mosq->in_callback = false;
+		}
+		pthread_mutex_unlock(&mosq->callback_mutex);
+		return MOSQ_ERR_CONN_LOST;
+	}
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 执行网络需要的各种各样的操作
+* 这个函数会处理__PINGs__，检测消息是否需要重发，所以调用很频繁
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br>参数无效，返回 MOSQ_ERR_INVAL<br>客户端没有连接broker，返回 MOSQ_ERR_NO_CONN
+
+###32、mosquitto_want_write
+```c
+bool mosquitto_want_write(struct mosquitto *mosq)
+{
+	if(mosq->out_packet || mosq->current_out_packet){
+		return true;
+#ifdef WITH_TLS
+	}else if(mosq->ssl && mosq->want_write){
+		return true;
+#endif
+	}else{
+		return false;
+	}
+}
+```
+* 如果有数据已经就绪，可以写入socket，返回true
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+返回值|如果有数据已经就绪，可以写入socket，返回true
+
+###33、mosquitto_threaded_set（在thread_mosq.c中实现）
+```c
+int mosquitto_threaded_set(struct mosquitto *mosq, bool threaded)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	mosq->threaded = threaded;
+
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 通知库使用了多线程，但不是使用__mosquitto_loop_start__开启的
+* 如果你自己管理线程，没有是有此函数，会因为资源竞争导致crash
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+threaded|如果你的程序使用了多线程，设置为__true__，否则为__false__
+返回值|*
+
+###34、设置参数（mosquitto_opts_set）
+```c
+int mosquitto_opts_set(struct mosquitto *mosq, enum mosq_opt_t option, void *value)
+{
+	int ival;
+
+	if(!mosq || !value) return MOSQ_ERR_INVAL;
+
+	switch(option){
+		case MOSQ_OPT_PROTOCOL_VERSION:
+			ival = *((int *)value);
+			if(ival == MQTT_PROTOCOL_V31){
+				mosq->protocol = mosq_p_mqtt31;
+			}else if(ival == MQTT_PROTOCOL_V311){
+				mosq->protocol = mosq_p_mqtt311;
+			}else{
+				return MOSQ_ERR_INVAL;
+			}
+			break;
+		default:
+			return MOSQ_ERR_INVAL;
+	}
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 设置客户端参数，必须在客户端连接前设置，
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+option|设置的参数。必须是int，MQTT_PROTOCOL_V31 或者 MQTT_PROTOCOL_V311<br>默认值为 MQTT_PROTOCOL_V31
+value|option指定的值
+
+###35、mosquitto_tls_set
+```c
+int mosquitto_tls_set(struct mosquitto *mosq, const char *cafile, const char *capath, const char *certfile, const char *keyfile, int (*pw_callback)(char *buf, int size, int rwflag, void *userdata))
+{
+#ifdef WITH_TLS
+	FILE *fptr;
+
+	if(!mosq || (!cafile && !capath) || (certfile && !keyfile) || (!certfile && keyfile)) return MOSQ_ERR_INVAL;
+
+	if(cafile){
+		fptr = _mosquitto_fopen(cafile, "rt");
+		if(fptr){
+			fclose(fptr);
+		}else{
+			return MOSQ_ERR_INVAL;
+		}
+		mosq->tls_cafile = _mosquitto_strdup(cafile);
+
+		if(!mosq->tls_cafile){
+			return MOSQ_ERR_NOMEM;
+		}
+	}else if(mosq->tls_cafile){
+		_mosquitto_free(mosq->tls_cafile);
+		mosq->tls_cafile = NULL;
+	}
+
+	if(capath){
+		mosq->tls_capath = _mosquitto_strdup(capath);
+		if(!mosq->tls_capath){
+			return MOSQ_ERR_NOMEM;
+		}
+	}else if(mosq->tls_capath){
+		_mosquitto_free(mosq->tls_capath);
+		mosq->tls_capath = NULL;
+	}
+
+	if(certfile){
+		fptr = _mosquitto_fopen(certfile, "rt");
+		if(fptr){
+			fclose(fptr);
+		}else{
+			if(mosq->tls_cafile){
+				_mosquitto_free(mosq->tls_cafile);
+				mosq->tls_cafile = NULL;
+			}
+			if(mosq->tls_capath){
+				_mosquitto_free(mosq->tls_capath);
+				mosq->tls_capath = NULL;
+			}
+			return MOSQ_ERR_INVAL;
+		}
+		mosq->tls_certfile = _mosquitto_strdup(certfile);
+		if(!mosq->tls_certfile){
+			return MOSQ_ERR_NOMEM;
+		}
+	}else{
+		if(mosq->tls_certfile) _mosquitto_free(mosq->tls_certfile);
+		mosq->tls_certfile = NULL;
+	}
+
+	if(keyfile){
+		fptr = _mosquitto_fopen(keyfile, "rt");
+		if(fptr){
+			fclose(fptr);
+		}else{
+			if(mosq->tls_cafile){
+				_mosquitto_free(mosq->tls_cafile);
+				mosq->tls_cafile = NULL;
+			}
+			if(mosq->tls_capath){
+				_mosquitto_free(mosq->tls_capath);
+				mosq->tls_capath = NULL;
+			}
+			if(mosq->tls_certfile){
+				_mosquitto_free(mosq->tls_certfile);
+				mosq->tls_certfile = NULL;
+			}
+			return MOSQ_ERR_INVAL;
+		}
+		mosq->tls_keyfile = _mosquitto_strdup(keyfile);
+		if(!mosq->tls_keyfile){
+			return MOSQ_ERR_NOMEM;
+		}
+	}else{
+		if(mosq->tls_keyfile) _mosquitto_free(mosq->tls_keyfile);
+		mosq->tls_keyfile = NULL;
+	}
+
+	mosq->tls_pw_callback = pw_callback;
+
+
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+
+#endif
+}
+```
+* 待添加
+* 待添加
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+cafile|
+capath|
+certfile|
+keyfile|
+pw_callback
+返回值|
+
+###36、mosquitto_tls_insecure_set
+```c
+int mosquitto_tls_insecure_set(struct mosquitto *mosq, bool value)
+{
+#ifdef WITH_TLS
+	if(!mosq) return MOSQ_ERR_INVAL;
+	mosq->tls_insecure = value;
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+#endif
+}
+```
+* 待添加
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+value|
+返回值|
+
+###37、mosquitto_tls_opts_set
+```c
+int mosquitto_tls_opts_set(struct mosquitto *mosq, int cert_reqs, const char *tls_version, const char *ciphers)
+{
+#ifdef WITH_TLS
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	mosq->tls_cert_reqs = cert_reqs;
+	if(tls_version){
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+		if(!strcasecmp(tls_version, "tlsv1.2")
+				|| !strcasecmp(tls_version, "tlsv1.1")
+				|| !strcasecmp(tls_version, "tlsv1")){
+
+			mosq->tls_version = _mosquitto_strdup(tls_version);
+			if(!mosq->tls_version) return MOSQ_ERR_NOMEM;
+		}else{
+			return MOSQ_ERR_INVAL;
+		}
+#else
+		if(!strcasecmp(tls_version, "tlsv1")){
+			mosq->tls_version = _mosquitto_strdup(tls_version);
+			if(!mosq->tls_version) return MOSQ_ERR_NOMEM;
+		}else{
+			return MOSQ_ERR_INVAL;
+		}
+#endif
+	}else{
+#if OPENSSL_VERSION_NUMBER >= 0x10001000L
+		mosq->tls_version = _mosquitto_strdup("tlsv1.2");
+#else
+		mosq->tls_version = _mosquitto_strdup("tlsv1");
+#endif
+		if(!mosq->tls_version) return MOSQ_ERR_NOMEM;
+	}
+	if(ciphers){
+		mosq->tls_ciphers = _mosquitto_strdup(ciphers);
+		if(!mosq->tls_ciphers) return MOSQ_ERR_NOMEM;
+	}else{
+		mosq->tls_ciphers = NULL;
+	}
+
+
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+
+#endif
+}
+```
+* 待添加
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+cert_reqs|
+tls_version|
+ciphers|
+返回值|
+
+###38、mosquitto_tls_psk_set
+```c
+int mosquitto_tls_psk_set(struct mosquitto *mosq, const char *psk, const char *identity, const char *ciphers)
+{
+#ifdef REAL_WITH_TLS_PSK
+	if(!mosq || !psk || !identity) return MOSQ_ERR_INVAL;
+
+	/* Check for hex only digits */
+	if(strspn(psk, "0123456789abcdefABCDEF") < strlen(psk)){
+		return MOSQ_ERR_INVAL;
+	}
+	mosq->tls_psk = _mosquitto_strdup(psk);
+	if(!mosq->tls_psk) return MOSQ_ERR_NOMEM;
+
+	mosq->tls_psk_identity = _mosquitto_strdup(identity);
+	if(!mosq->tls_psk_identity){
+		_mosquitto_free(mosq->tls_psk);
+		return MOSQ_ERR_NOMEM;
+	}
+	if(ciphers){
+		mosq->tls_ciphers = _mosquitto_strdup(ciphers);
+		if(!mosq->tls_ciphers) return MOSQ_ERR_NOMEM;
+	}else{
+		mosq->tls_ciphers = NULL;
+	}
+
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+#endif
+}
+```
+* 待添加
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+psk|
+identity|
+ciphers|
+返回值|
+
+###39、mosquitto_connect_callback_set
+```c
+void mosquitto_connect_callback_set(struct mosquitto *mosq, void (*on_connect)(struct mosquitto *, void *, int))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_connect = on_connect;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置连接回调函数，当broker发送CONNACK作为连接响应时调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+on_connect|回调函数
+
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+rc|连接响应的返回码<br>0 - success<br> 1 - 连接拒绝，因为版本不被接受<br> 2 - 连接拒绝，标识符拒绝<br>3 - 连接拒绝，broker不可用 <br> 4-255 保留
+
+###40、mosquitto_disconnect_callback_set
+```c
+void mosquitto_disconnect_callback_set(struct mosquitto *mosq, void (*on_disconnect)(struct mosquitto *, void *, int))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_disconnect = on_disconnect;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置断开连接时的回调
+* 当broker收到__DISCONNECT__命令，断开客户端时调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+on_disconnect|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+rc|整型，表明断开的原因。0，表示客户端调用 mosquitto_disconnect <br>其他数值，未知原因的断开
+
+###41、mosquitto_publish_callback_set
+```c
+void mosquitto_publish_callback_set(struct mosquitto *mosq, void (*on_publish)(struct mosquitto *, void *, int))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_publish = on_publish;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置发布回调函数
+* 当消息成功发送到broker后调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+on_publish|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+mid|发送消息的消息id
+
+
+###42、mosquitto_message_callback_set
+```c
+void mosquitto_message_callback_set(struct mosquitto *mosq, void (*on_message)(struct mosquitto *, void *, const struct mosquitto_message *))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_message = on_message;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置接收到broker消息时的回调函数
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+on_message|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+message|消息数据，在回调函数结束后，这个消息所绑定的内存将被释放。客户端可以根据需要拷贝消息数据
+
+###43、mosquitto_subscribe_callback_set
+```c
+void mosquitto_subscribe_callback_set(struct mosquitto *mosq, void (*on_subscribe)(struct mosquitto *, void *, int, int, const int *))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_subscribe = on_subscribe;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置订阅回调。当broker对订阅要求响应时触发
+* 参数说明
+
+name|description|
+---|------------|
+mosq|客户端实例
+on_subscribe|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+mid|订阅消息的消息id
+qos_count|granted_qos的大小，准许订阅的数量
+granted_qos|整型数组，表明每条订阅的准许的服务质量
+
+###44、mosquitto_unsubscribe_callback_set
+```c
+void mosquitto_unsubscribe_callback_set(struct mosquitto *mosq, void (*on_unsubscribe)(struct mosquitto *, void *, int))
+{
+	pthread_mutex_lock(&mosq->callback_mutex);
+	mosq->on_unsubscribe = on_unsubscribe;
+	pthread_mutex_unlock(&mosq->callback_mutex);
+}
+```
+* 设置取消订阅的回调函数。当接收到broker对于取消订阅的响应时调用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+on_unsubscribe|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+mid|发送消息的消息id
+
+###45、mosquitto_log_callback_set
+```c
+void mosquitto_log_callback_set(struct mosquitto *mosq, void (*on_log)(struct mosquitto *, void *, int, const char *))
+{
+	pthread_mutex_lock(&mosq->log_callback_mutex);
+	mosq->on_log = on_log;
+	pthread_mutex_unlock(&mosq->log_callback_mutex);
+}
+```
+* 设置日志回调函数。当你需要从客户端库中获取日志消息时使用
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+on_log|回调函数
+* 回调函数参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户数据，mosquitto_new 中提供的数据
+level|日志级别：<br>MOSQ_LOG_INFO<br>MOSQ_LOG_NOTICE<br>MOSQ_LOG_WARNING<br>MOSQ_LOG_ERR<br>MOSQ_LOG_DEBUG
+str|消息内容
+
+###46、mosquitto_reconnect_delay_set
+```c
+int mosquitto_reconnect_delay_set(struct mosquitto *mosq, unsigned int reconnect_delay, unsigned int reconnect_delay_max, bool reconnect_exponential_backoff)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+	
+	mosq->reconnect_delay = reconnect_delay;
+	mosq->reconnect_delay_max = reconnect_delay_max;
+	mosq->reconnect_exponential_backoff = reconnect_exponential_backoff;
+	
+	return MOSQ_ERR_SUCCESS;
+	
+}
+```
+* 当客户端在__mosquitto_loop_forever__中，或者调用__mosquitto_loop_start__后，因为未知的原因断开连接后，会尝试重新连接。默认情况下，每个1秒会尝试连接1次，直到连接成功
+* 使用此函数，可以设置尝试连接的时间间隔，可以开启指数补偿来设置尝试连接的延迟以及上限值。例如，
+
+```
+Example 1:
+	delay=2, delay_max=10, exponential_backoff=False
+	Delays would be: 2, 4, 6, 8, 10, 10, ...
+
+Example 2:
+	delay=3, delay_max=30, exponential_backoff=True
+	Delays would be: 3, 6, 12, 24, 30, 30, ...
+```
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+reconnect_delay|重新连接的间隔时间，单位：秒
+reconnect_delay_max|尝试连接的上限时间间隔
+reconnect_exponential_backoff|是否开启指数补偿，<br>false，参考Example1<br>true，参考Example2
+返回值|成功，返回MOSQ_ERR_SUCCESS<br>参数无效，返回MOSQ_ERR_INVAL
+
+###46、mosquitto_max_inflight_messages_set（在message_mosq.c中实现）
+```c
+int mosquitto_max_inflight_messages_set(struct mosquitto *mosq, unsigned int max_inflight_messages)
+{
+	if(!mosq) return MOSQ_ERR_INVAL;
+
+	mosq->max_inflight_messages = max_inflight_messages;
+
+	return MOSQ_ERR_SUCCESS;
+}
+```
+* 表示允许多大数量的QoS为1或2消息被同时进行传输处理。这些消息包括正在进行握手的消息和进行重新发送的消息。默认为20个，
+如果设置为0，表示不设限制；如果为1，则会确保消息被顺序处理。
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+max_inflight_messages|最大并发数量，默认20
+返回值|成功，返回 MOSQ_ERR_SUCCESS<br> 参数无效，返回 MOSQ_ERR_INVAL
+
+###47、mosquitto_message_retry_set
+```c
+void mosquitto_message_retry_set(struct mosquitto *mosq, unsigned int message_retry)
+{
+	assert(mosq);
+	if(mosq) mosq->message_retry = message_retry;
+}
+```
+* 设置重复消息的时间间隔，用于QoS>0的消息。可以在任何时候调用。
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+message_retry|等待响应的时间，默认是20秒
+
+###48、mosquitto_user_data_set
+```c
+void mosquitto_user_data_set(struct mosquitto *mosq, void *userdata)
+{
+	if(mosq){
+		mosq->userdata = userdata;
+	}
+}
+```
+* 当调用__mosquitto_new__时，会传递参数“obj”，这个指针将会作为用户数据传递给回调函数使用。
+* 此函数可以在任何时间更新用户数据
+* 此函数不会修改当前用户数据的内存，如果想要动态的分配内存，需要用户自己释放
+* 参数说明
+
+name|description|
+---|------------|
+mosq|mosquitto实例
+obj|用户指针，会作为参数传递给任意一个回调函数使用
+
+###49、mosquitto_socks5_set
+```c
+int mosquitto_socks5_set(struct mosquitto *mosq, const char *host, int port, const char *username, const char *password)
+{
+#ifdef WITH_SOCKS
+	if(!mosq) return MOSQ_ERR_INVAL;
+	if(!host || strlen(host) > 256) return MOSQ_ERR_INVAL;
+	if(port < 1 || port > 65535) return MOSQ_ERR_INVAL;
+
+	if(mosq->socks5_host){
+		_mosquitto_free(mosq->socks5_host);
+	}
+
+	mosq->socks5_host = _mosquitto_strdup(host);
+	if(!mosq->socks5_host){
+		return MOSQ_ERR_NOMEM;
+	}
+
+	mosq->socks5_port = port;
+
+	if(mosq->socks5_username){
+		_mosquitto_free(mosq->socks5_username);
+	}
+	if(mosq->socks5_password){
+		_mosquitto_free(mosq->socks5_password);
+	}
+
+	if(username){
+		mosq->socks5_username = _mosquitto_strdup(username);
+		if(!mosq->socks5_username){
+			return MOSQ_ERR_NOMEM;
+		}
+
+		if(password){
+			mosq->socks5_password = _mosquitto_strdup(password);
+			if(!mosq->socks5_password){
+				_mosquitto_free(mosq->socks5_username);
+				return MOSQ_ERR_NOMEM;
+			}
+		}
+	}
+
+	return MOSQ_ERR_SUCCESS;
+#else
+	return MOSQ_ERR_NOT_SUPPORTED;
+#endif
+}
+```
+
+* 待添加
+
+###50、mosquitto_strerror
+```c
+const char *mosquitto_strerror(int mosq_errno)
+{
+	switch(mosq_errno){
+		case MOSQ_ERR_CONN_PENDING:
+			return "Connection pending.";
+		case MOSQ_ERR_SUCCESS:
+			return "No error.";
+		case MOSQ_ERR_NOMEM:
+			return "Out of memory.";
+		case MOSQ_ERR_PROTOCOL:
+			return "A network protocol error occurred when communicating with the broker.";
+		case MOSQ_ERR_INVAL:
+			return "Invalid function arguments provided.";
+		case MOSQ_ERR_NO_CONN:
+			return "The client is not currently connected.";
+		case MOSQ_ERR_CONN_REFUSED:
+			return "The connection was refused.";
+		case MOSQ_ERR_NOT_FOUND:
+			return "Message not found (internal error).";
+		case MOSQ_ERR_CONN_LOST:
+			return "The connection was lost.";
+		case MOSQ_ERR_TLS:
+			return "A TLS error occurred.";
+		case MOSQ_ERR_PAYLOAD_SIZE:
+			return "Payload too large.";
+		case MOSQ_ERR_NOT_SUPPORTED:
+			return "This feature is not supported.";
+		case MOSQ_ERR_AUTH:
+			return "Authorisation failed.";
+		case MOSQ_ERR_ACL_DENIED:
+			return "Access denied by ACL.";
+		case MOSQ_ERR_UNKNOWN:
+			return "Unknown error.";
+		case MOSQ_ERR_ERRNO:
+			return strerror(errno);
+		case MOSQ_ERR_EAI:
+			return "Lookup error.";
+		case MOSQ_ERR_PROXY:
+			return "Proxy error.";
+		default:
+			return "Unknown error.";
+	}
+}
+```
+* 获取mosquitto错误码
+* 参数说明
+
+name|description|
+---|------------|
+mosq_errno|mosquitto错误码
+返回值|描述错误的字符串
+
+###51、mosquitto_connack_string
+```c
+const char *mosquitto_connack_string(int connack_code)
+{
+	switch(connack_code){
+		case 0:
+			return "Connection Accepted.";
+		case 1:
+			return "Connection Refused: unacceptable protocol version.";
+		case 2:
+			return "Connection Refused: identifier rejected.";
+		case 3:
+			return "Connection Refused: broker unavailable.";
+		case 4:
+			return "Connection Refused: bad user name or password.";
+		case 5:
+			return "Connection Refused: not authorised.";
+		default:
+			return "Connection Refused: unknown reason.";
+	}
+}
+```
+* 获取描述MQTT连接结果的字符串
+
+name|description|
+---|------------|
+connack_code|MQTT连接结果
+返回值|描述结果的字符串
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 
 
  <br>
