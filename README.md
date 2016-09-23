@@ -4,3 +4,4 @@
 ##mqttLearning
 ###1、[学习使用__mosquitto__，包括安装、使用源码分析](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoLearn.markdown)
 ###2、[模块分析：mosquitto](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoModule.markdown) 
+###3、[模块分析：other module](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/otherModule.markdown)
