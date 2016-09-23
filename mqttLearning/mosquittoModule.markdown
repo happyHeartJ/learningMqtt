@@ -2190,4 +2190,6 @@ name|description|
 ---|------------|
 str|要检测的订阅
 返回值|成功，返回 MOSQ_ERR_SUCCESS<br>如果包含'+'或者'#'，或者长度过大，返回 MOSQ_ERR_INVAL
-
+  
+----
+(That's all)
