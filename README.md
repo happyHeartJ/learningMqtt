@@ -1,7 +1,9 @@
 # Learn MQTT and mosquitto
-![MQTT](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mqttorg-glow.png) ![mosquitto](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.png)
+![MQTT](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mqttorg-glow.png) ![mosquitto](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto-fit.png)
+----
 ## [mosquittoDll](https://github.com/happyHeartJ/learningMqtt/tree/master/moquittoDll)
-###[Windows使用mosquitto demo的简单教程](https://github.com/happyHeartJ/learningMqtt/blob/master/moquittoDll/useMosquittoDemo.markdown)
+###1、[Windows使用mosquitto demo的简单教程](https://github.com/happyHeartJ/learningMqtt/blob/master/moquittoDll/useMosquittoDemo.markdown)
+----
 ##[mqttLearning](https://github.com/happyHeartJ/learningMqtt/tree/master/mqttLearning)
 ###1、[学习使用__mosquitto__，包括安装、使用源码分析](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoLearn.markdown)
 ###2、[模块分析：mosquitto](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoModule.markdown) 
