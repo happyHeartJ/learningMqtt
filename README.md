@@ -6,3 +6,4 @@
 ###2、[模块分析：mosquitto](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoModule.markdown) 
 ###3、[模块分析：other module](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/otherModule.markdown)
 ###4、[配置文件及参数说明: mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/configuration.markdown)
+###5、[分析mosquitto的client](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/pub_sbu_client.markdown)
