@@ -21,6 +21,125 @@ struct mosquitto_client_msg;
 * 其他变量定义
 * 头文件包含
 
+##主要数据结构
+* 客户端状态，用户连接成功，并且发送CONNECT之后的结果
+
+
+```c
+enum mosquitto_client_state {
+
+    mosq_cs_new = 0,
+
+    mosq_cs_connected = 1,
+
+    mosq_cs_disconnecting = 2,// mosquitto_disconnect时设置
+
+    mosq_cs_connect_async = 3,// mosquitto_connect_bind_async，异步线程来connect _mosquitto_thread_main（需要WITH_THREADING）
+
+    mosq_cs_connect_pending = 4//没用到
+
+};
+```
+* 消息状态，响应的状态表达为__mosq_ms_wait_for_xxxx__，客户端处理此类消息，消息的收发流程使用
+
+
+```c
+enum mosquitto_msg_state {。
+
+    mosq_ms_invalid = 0,
+
+    mosq_ms_publish_qos0 = 1,
+
+    mosq_ms_publish_qos1 = 2,
+
+    mosq_ms_wait_for_puback = 3,//Oos==1时，发送PUBLISH后等待PUBACK返回
+
+    mosq_ms_publish_qos2 = 4,
+
+    mosq_ms_wait_for_pubrec = 5, //Oos==2时，发送PUBLISH后，等待PUBREC返回
+
+    mosq_ms_resend_pubrel = 6,
+
+    mosq_ms_wait_for_pubrel = 7, //Oos==2时，发送PUBREC后等待PUBREL返回
+
+    mosq_ms_resend_pubcomp = 8,
+
+    mosq_ms_wait_for_pubcomp = 9, //Oos==2时，发送PUBREL后等待PUBCOMP返回
+
+    mosq_ms_send_pubrec = 10,
+
+    mosq_ms_queued = 11
+
+};
+```
+* 数据包，发送的数据在组包之后，或者接收的数据在解包之前的状态
+
+```c
+struct _mosquitto_packet{
+
+    uint8_t *payload;
+
+    struct _mosquitto_packet *next;
+
+    uint32_t remaining_mult;
+
+    uint32_t remaining_length;
+
+    uint32_t packet_length;
+
+    uint32_t to_process;//发送进度，记录还未发送多少字节，缺省为packet_length
+
+    uint32_t pos;//组包或者发送时用到，发送时记录发送到什么位置
+
+    uint16_t mid;//消息id，当Qos==0 时回调on_publish时用
+
+    uint8_t command;
+
+    int8_t remaining_count;
+
+};
+```
+* 消息
+
+```c
+struct mosquitto_message{
+
+    int mid;
+
+    char *topic;
+
+    void *payload;
+
+    int payloadlen;
+
+    int qos;
+
+    bool retain;
+
+};
+```
+* 消息队列
+
+```c
+struct mosquitto_message_all{
+
+    struct mosquitto_message_all *next;
+
+    time_t timestamp;//时间，记录本地软件tick时间
+
+    //enum mosquitto_msg_direction direction;
+
+    enum mosquitto_msg_state state;
+
+    bool dup;
+
+    struct mosquitto_message msg;
+
+};
+```
+* 上下文会话属性
+
+
 ```c
 struct mosquitto {
 
