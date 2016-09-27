@@ -21,6 +21,166 @@ struct mosquitto_client_msg;
 * 其他变量定义
 * 头文件包含
 
+```c
+struct mosquitto {
+
+    mosq_sock_t sock;
+
+    // socket管道通知：非阻塞模式时
+    //通知用，在mosquitto_loop 调用发送,
+    mosq_sock_t sockpairR, sockpairW;
+
+    enum _mosquitto_protocol protocol;
+
+    char *address;
+
+    char *id;//客户端ID
+
+    char *username;
+
+    char *password;
+
+    uint16_t keepalive;
+
+    uint16_t last_mid;  //最后一个消息id，发消息后++
+
+    enum mosquitto_client_state state;
+
+    time_t last_msg_in;
+
+    time_t last_msg_out;
+
+    time_t ping_t;
+
+    struct _mosquitto_packet in_packet;//接收数据包用
+
+    struct _mosquitto_packet *current_out_packet;
+
+    struct _mosquitto_packet *out_packet;//发送数据包队列
+
+    struct mosquitto_message *will;
+
+#ifdef WITH_TLS
+
+    SSL *ssl;
+
+    SSL_CTX *ssl_ctx;
+
+    char *tls_cafile;
+
+    char *tls_capath;
+
+    char *tls_certfile;
+
+    char *tls_keyfile;
+
+    int (*tls_pw_callback)(char *buf, int size, int rwflag, void *userdata);
+
+    char *tls_version;
+
+    char *tls_ciphers;
+
+    char *tls_psk;
+
+    char *tls_psk_identity;
+
+    int tls_cert_reqs;
+
+    bool tls_insecure;
+
+#endif
+
+    bool want_write;
+
+    bool want_connect;
+
+#if defined(WITH_THREADING) && !defined(WITH_BROKER)
+
+    pthread_mutex_t callback_mutex;
+
+    pthread_mutex_t log_callback_mutex;
+
+    pthread_mutex_t msgtime_mutex;
+
+    pthread_mutex_t out_packet_mutex;
+
+    pthread_mutex_t current_out_packet_mutex;
+
+    pthread_mutex_t state_mutex;
+
+    pthread_mutex_t in_message_mutex;
+
+    pthread_mutex_t out_message_mutex;
+
+    pthread_mutex_t mid_mutex;
+
+    pthread_t thread_id;
+
+#endif
+
+    bool clean_session;
+
+ 
+
+    void *userdata;
+
+    bool in_callback;
+
+    unsigned int message_retry;
+
+    time_t last_retry_check;
+
+    struct mosquitto_message_all *in_messages;//收到消息队列
+
+    struct mosquitto_message_all *in_messages_last;
+
+    struct mosquitto_message_all *out_messages;发送消息队列
+
+    struct mosquitto_message_all *out_messages_last;
+
+ 
+
+    void (*on_connect)(struct mosquitto *, void *userdata, int rc);
+
+    void (*on_disconnect)(struct mosquitto *, void *userdata, int rc);
+
+    void (*on_publish)(struct mosquitto *, void *userdata, int mid);
+
+    void (*on_message)(struct mosquitto *, void *userdata, const struct mosquitto_message *message);
+
+    void (*on_subscribe)(struct mosquitto *, void *userdata, int mid, int qos_count, const int *granted_qos);
+
+    void (*on_unsubscribe)(struct mosquitto *, void *userdata, int mid);
+
+    void (*on_log)(struct mosquitto *, void *userdata, int level, const char *str);
+
+    //void (*on_error)();
+
+    char *host;
+
+    int port;
+
+    int in_queue_len;  //收到消息队列长度
+
+    int out_queue_len;//发送消息队列长度
+
+    char *bind_address;
+
+    unsigned int reconnect_delay;
+
+    unsigned int reconnect_delay_max;
+
+    bool reconnect_exponential_backoff;
+
+    bool threaded;
+
+    int inflight_messages; //对于Qos>0的消息，记录没有完成交互记录
+
+    int max_inflight_messages;
+
+};
+```
+
   <br>
 <font color="red" size="5">代码详细注解待添加</font>  
 
