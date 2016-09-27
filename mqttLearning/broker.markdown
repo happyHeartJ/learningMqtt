@@ -1,5 +1,5 @@
 #broker源码分析
-----
+
 (mosquitto的broker源码位于 __mosquitto-1.4.8/src/mosquitto.c__)
 
 broker中引用了__mosquitto_broker.h__、__memory_mosq.h__、__util_mosq.h__等头文件。
