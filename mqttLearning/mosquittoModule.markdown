@@ -1150,7 +1150,7 @@ int mosquitto_loop_misc(struct mosquitto *mosq)
 	return MOSQ_ERR_SUCCESS;
 }
 ```
-* 执行网络需要的各种各样的操作
+* 执行网络需要的各种各样的操作，作为network loop的一部分执行，包括处理PING和检查消息是否需要再次发送。
 * 这个函数会处理__PINGs__，检测消息是否需要重发，所以调用很频繁
 * 参数说明
 
