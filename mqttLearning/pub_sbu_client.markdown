@@ -293,7 +293,8 @@ int main(int argc, char *argv[])
 		}
 	}while(rc == MOSQ_ERR_SUCCESS && connected);
 ```
-这里会根据当前的模式来启动消息循环，由于使用的是__MSGMODE_CMD__模式，所以会调用__mosquitto_loop__来启动循环。__mosquitto_loop__使用select方式来处理socket的接收和发送。将__mosquitto__实例中的__sock__放入两个__fd_set__，分别代表读和写。再将__sockpairR__也放入__读fd_set__中。__sockpairR__用来在select()超时前跳出select()，与之对应的有__sockpairW__，将__sockpairW__放入__写fd_set__中。
+这里会根据当前的模式来启动消息循环，由于使用的是__MSGMODE_CMD__模式，所以会调用__mosquitto_loop__来启动循环。当接收到broker发送的CONNACK消息后，调用连接回调函数，回调函数中使用__mosquitto_publish__接口发布消息。  
+__mosquitto_loop__使用select方式来处理socket的接收和发送。将__mosquitto__实例中的__sock__放入两个__fd_set__，分别代表读和写。再将__sockpairR__也放入__读fd_set__中。__sockpairR__用来在select()超时前跳出select()，与之对应的有__sockpairW__，将__sockpairW__放入__写fd_set__中。
 ```c
 	if(mode == MSGMODE_STDIN_LINE){
 		mosquitto_loop_stop(mosq, false);

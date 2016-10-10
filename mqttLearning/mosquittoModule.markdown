@@ -836,7 +836,7 @@ int mosquitto_loop(struct mosquitto *mosq, int timeout, int max_packets)
 ```
 * 客户端的网络工作主循环。必须周期性的调用此函数来保证客户端和broker之间的通信。如果流入数据已经就绪，将会被处理。通常会在调用发布消息时立刻将消息发出。此函数会尝试发送任何已经保留的输出消息，包括一部分用于QoS>0的消息流中的命令（？待确定）
 * 可以在客户端所拥有的线程中开启循环，使用的方法是__mosquitto_loop_start__
-* 此方法使用select方式进行轮询监控socket，如果想要整合mosquitto客户端和自己的select方法，可以是用__mosquitto_socket__，__mosquitto_loop_read__，__mosquitto_loop_write__和__mosquitto_loop_misc__
+* 此方法使用select方式进行轮询监控socket，如果想要整合mosquitto客户端和自己的select方法，可以使用__mosquitto_socket__，__mosquitto_loop_read__，__mosquitto_loop_write__和__mosquitto_loop_misc__
 * 参数说明
 
 name|description|
