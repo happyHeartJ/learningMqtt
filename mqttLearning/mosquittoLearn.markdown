@@ -40,14 +40,14 @@ yum install libssl-devel
 ```  
 * 执行找不到__libmosquitto.so.1__  
 ```
-  修改libmosquitto.so位置，  
+  修改libmosquitto.so.1位置，  
 
   sudo ln -s /usr/local/lib/libmosquitto.so.1 /usr/lib/libmosquitto.so.1  
   sudo ldconfig
 ```
 * 执行找不到__libmosquittopp.so.1__  
 ```
-  修改libmosquittopp.so位置，  
+  修改libmosquittopp.so.1位置，  
 
   sudo ln -s /usr/local/lib/libmosquittopp.so.1 /usr/lib/libmosquittopp.so.1  
   sudo ldconfig
