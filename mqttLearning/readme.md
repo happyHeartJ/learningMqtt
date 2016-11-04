@@ -9,3 +9,5 @@ mosquitto提供的其他模块分析
 mosquitto的config.mk文件分析，mosquitto.conf文件文件，发布参数、订阅参数、消息类型说明
 ##5、[mosquitto的client分析](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/pub_sbu_client.markdown)
 mosquitto的client分析。分析了sub_client和pub_client源码
+##6、[mosquitto.conf详细分析](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoConfDetail.markdown)
+mosquitto.conf的详细配置说明
