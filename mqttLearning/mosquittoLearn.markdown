@@ -1,5 +1,5 @@
 #mosquitto
-##安装mosquitto (Linux，已经安装g++)
+##安装mosquitto (Linux，Centos 6.7，已经安装g++)
 * 下载源码，可以在[mosquitto](https://github.com/eclipse/mosquitto)的_github_ 上下载
 * 解压缩
 ```
@@ -21,7 +21,7 @@ sudo make install
 注意事项：
 * 找不到__openssl/ssl.h__  
 ```
-yum install libssl-devel
+yum install openssl-devel
 ```
 * 编译过程找不到__ares.h__  
 ```
