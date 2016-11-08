@@ -621,15 +621,116 @@ threshold count
 启动lazy类型的桥接的队列中消息数量的阈值。默认为__10__。
 
 ###topic
+设置格式：
+```
+topic pattern [[[ out | in | both ] qos-level] local-prefix remote-prefix]
+```
+设置桥接的topic。桥接中的broker，其实相当于彼此订阅的client，需要设置订阅和发布topic。任何符合pattern定义的topic都会在桥接中共享。  
+对于local broker，in表示消息来自remote broker，流入local broker；out表示消息来自local broker，流向remote broker；both表示双向均可。默认值为__out__。  
+qos-level定义了topic的消息级别，默认值为__0__。  
+local-prefix 和 remote-prefix是附加的topic前缀。local broker会向remote broker订阅remote-prefix/topic，当有client发布匹配的消息至remote broker时，remote broker会将消息转发至local broker，桥接会将remote-prefix替换成local-prefix，构成local-prefix/topic，订阅此topic的client会收到消息。同样的,当local broker接收到client发布的消息,发布主题为local-prefix/topic，会将local-prefix/topic替换成remote-prefix/topic转发至remote broker，此时，在remote broker订阅remote-prefix/topic的client可以收到消息。  
+local和remote是相对的概念，topic或者消息率先到达的broker即为local broker，转发消息的目的地，即为remote broker。下列图显示了使用桥接的过程。  
+配置桥接信息，  
+* connection bridge_14_15
+* address 192.168.72.14:1883
+* cleansession true
+* topic # both 0 local/topic/ remote/topic/
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/21.png)  
+本地ip地址为192.168.72.14，远端ip为192.268.72.15。  
+启动remote broker和local broker，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/22.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/23.png)  
+可以看到桥接在loca broker上订阅的topic是local/topic/#，在remote broker上订阅的topic是remote/topic/#。  
+启动client在local broker和remote broker上订阅，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/24.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/25.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/26.png)  
+启动client，发布消息，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/27.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/28.png)  
+桥接已经将prefix进行替换，订阅在remote broker和local broker的client均收到的了消息，在remote broker和local broker上的内容如下，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/29.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/30.png)  
+更换topic和ip重新发布消息，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/31.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/32.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/33.png)  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/34.png)  
+local-prefix和remote-prefix均为可选项。空prefix可以使用””替代。  
 ###try_private
+设置格式：
+```
+try_private [ true | false ]
+```
+默认值为__true__，意味着桥接不会将broker看作普通的client。
+
 ##SSL/TLS Support
 对于所有的桥接都可以使用SSL/TLS。
-###bridge_attempt_unsubscribe
 ###bridge_cafile
+设置格式：
+```
+bridge_cafile file path
+```
+开启SSL/TLS支持，bridge_cafile和bridge_capath至少要设置其中一个。
+bridge_cafile指定了一个PEM编码的CA证书文件，该证书已经为remote broker签名。
+
 ###bridge_capath
+设置格式：
+```
+bridge_capath file path
+```
+开启SSL/TLS支持，bridge_cafile和bridge_capath至少要设置其中一个。
+指定一个目录，目录中包含PEM编码的CA证书文件，并且已经为remote broker签名。文件必须以”.crt”结尾。每次添加或删除一个证书时，使用命令：
+```
+c_rehash <path to bridge_capath>
+```
+
 ###bridge_certfile
+设置格式：
+```
+bridge_certfile file path
+```
+用于桥接的PEM编码的client证书文件目录。
+
 ###bridge_identity
+设置格式：
+```
+bridge_identity identity
+```
+使用PSK加密的client identity。对于一个桥接，一次仅能使用1个PSK加密的证书文件。
+
 ###bridge_insecure
+设置格式：
+```
+bridge_insecure [ true | false ]
+```
+设置为false，禁止主机名验证。设置为true，有可能会遭到第三方的恶意攻击。在生产环境中，需要将此项设置为false。
+
 ###bridge_keyfile
+设置格式：
+```
+bridge_keyfile file path
+```
+指定目录，目录中包含用于桥接的PEM编码的key。
+
 ###bridge_psk
+设置格式：
+```
+bridge_psk key
+```
+PEM编码的十六进制格式key文件。
+
 ###bridge_tls_version
+设置格式：
+```
+bridge_tls_version version
+```
+设置桥接使用的TLS版本。可选项有：
+* tlsv1.2，默认值
+* tlsv1.1 
+* tlsv1
+remote broker必须支持相同的TLS版本才能连接成功。
+
+----
+部分内容翻译的较为生硬，有些理解也不完全正确，暂且定为目标，后续有时间再修改
+(That's all)
