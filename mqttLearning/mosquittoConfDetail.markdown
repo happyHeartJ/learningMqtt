@@ -28,10 +28,12 @@ user <username>
 来限制具体的用户对topic的访问，这里的用户名是在password_file文件中定义的，并不是client id。此时，使用格式为：
 pattern [read|write|readwrite] <topic>
 来控制topic的read、write权限。在topic中可以使用
-	%c来匹配client id
-	%u来匹配client username
+* %c来匹配client id
+* %u来匹配client username
+
 例如，pattern write sensor/%u/data。
-安装mosquitto后，在/etc/mosquitto/目录下，会有acfile.example。可以参照修改。内容如下图所示，
+安装mosquitto后，在/etc/mosquitto/目录下，会有acfile.example。可以参照修改。内容如下图所示，  
+![mosquitto.conf](https://github.com/happyHeartJ/learningMqtt/blob/master/imgs/mosquitto.conf/1.png)
  
 
 ###allow_anonymous
