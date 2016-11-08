@@ -1,4 +1,5 @@
 #mosquitto.conf详细说明
+##（转载请注明出处）
 
 __mosquitto.conf__是mosquitto broker的配置文件，在启动配置broker时，可以通过参数__“-c”__来选择加载__mosquitto.conf__来使用文件中的配置。默认地，broker不需要加载mosquitto.conf，会使用默认参数。  
 
@@ -732,5 +733,5 @@ bridge_tls_version version
 remote broker必须支持相同的TLS版本才能连接成功。
 
 ----
-部分内容翻译的较为生硬，有些理解也不完全正确，暂且定为目标，后续有时间再修改
+部分内容翻译的较为生硬，有些理解也不完全正确，暂且定为目标，后续有时间再修改  
 (That's all)
