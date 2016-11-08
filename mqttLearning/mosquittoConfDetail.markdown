@@ -13,6 +13,27 @@ MQTT协议本身提供了用户名/密码的身份验证。使用password_file�
 使用pre-shared-key需要开启psk_hint 和 psk_file options选项。客户端必须提供有效的id和key才可以成功连接broker。如果设置use_identity_as_username为true，那么会使用PSK id来代替MQTT用户名，以此来验证身份。  
 
 ###acl_file
+设置acl_file的路径，格式如下：
+```
+acl_file file path
+```
+acl_file的内容包含client可以访问的topic。acl_file限定topic访问权限的格式为：
+```
+topic [read|write|readwrite] <topic>
+```
+
+默认值为__read/write__，topic可以包含过滤器限定符__“+”__和__“#”__。
+	当allow_anonymous设置为true时，以上的设置是针对所有的匿名登录的client。如果allow_anonymous设置为false，将不允许匿名登录。可以使用格式为：
+user <username>
+来限制具体的用户对topic的访问，这里的用户名是在password_file文件中定义的，并不是client id。此时，使用格式为：
+pattern [read|write|readwrite] <topic>
+来控制topic的read、write权限。在topic中可以使用
+	%c来匹配client id
+	%u来匹配client username
+例如，pattern write sensor/%u/data。
+安装mosquitto后，在/etc/mosquitto/目录下，会有acfile.example。可以参照修改。内容如下图所示，
+ 
+
 ###allow_anonymous
 ###allow_duplicate_messages
 ###autosave_interval
