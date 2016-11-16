@@ -564,7 +564,7 @@ int mosquitto_publish(struct mosquitto *mosq, int *mid, const char *topic, int p
 name|description|
 ---|------------|
 mosq|一个有效的客户端实例|
-mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
+mid|int指针。<br>如果不为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
 topic|发布消息的topic
 payloadlen|载荷长度，长度在0-268,435,455之间
 payload|载荷，如果payloadlen长度大于0，则必须指向一块有效的内存
@@ -590,7 +590,7 @@ int mosquitto_subscribe(struct mosquitto *mosqq, int *mid, const char *sub, int 
 name|description|
 ---|------------|
 mosqq |一个有效的客户端实例|
-mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
+mid|int指针。<br>如果不为NULL，函数将其设定给消息的message id。<br>可以与消息发布后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息
 topic|发布消息的topic
 sub |订阅模式
 qos |订阅要求的服务质量
@@ -614,7 +614,7 @@ int mosquitto_unsubscribe(struct mosquitto *mosq, int *mid, const char *sub)
 name|description|
 ---|------------|
 mosq |一个有效的客户端实例|
-mid|int指针。<br>如果为NULL，函数将其设定给消息的message id。<br>可以与取消订阅后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息|
+mid|int指针。<br>如果不为NULL，函数将其设定给消息的message id。<br>可以与取消订阅后的回调函数一起使用<br>需要注意，虽然MQTT协议没有在QoS=0的消息中使用message id，但libmosquitto为这些消息指定了message id，通过这些参数可以跟踪消息|
 sub|取消定于的模式
 返回值|成功，返回MOSQ_ERR_SUCCESS <br>参数无效，返回MOSQ_ERR_INVAL <br>内存溢出，MOSQ_ERR_NOMEM <br>客户端并没有连接到broker，返回MOSQ_ERR_NO_CONN
 
