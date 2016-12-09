@@ -22,6 +22,32 @@ struct mosquitto_client_msg;
 * 头文件包含
 
 ##主要数据结构
+* 消息方向枚举值
+
+```c
+enum mosquitto_msg_direction {
+	mosq_md_in = 0,// 流 入
+	mosq_md_out = 1// 流 出
+};
+```
+* 消息状态枚举值
+
+```c
+enum mosquitto_msg_state {
+	mosq_ms_invalid = 0,        
+	mosq_ms_publish_qos0 = 1,    
+	mosq_ms_publish_qos1 = 2,    
+	mosq_ms_wait_for_puback = 3,    //等待puback
+	mosq_ms_publish_qos2 = 4,        
+	mosq_ms_wait_for_pubrec = 5,    //等待pubrec
+	mosq_ms_resend_pubrel = 6,        
+	mosq_ms_wait_for_pubrel = 7,      //等待pubrel
+	mosq_ms_resend_pubcomp = 8,        
+	mosq_ms_wait_for_pubcomp = 9,        //等待pubcomp
+	mosq_ms_send_pubrec = 10,           
+	mosq_ms_queued = 11                    
+};
+```
 * 客户端状态，用户连接成功，并且发送CONNECT之后的结果
 
 
@@ -46,30 +72,51 @@ enum mosquitto_client_state {
 ```c
 enum mosquitto_msg_state {。
 
-    mosq_ms_invalid = 0,
+    mosq_ms_invalid = 0,        //消 息 无 效
 
-    mosq_ms_publish_qos0 = 1,
+    mosq_ms_publish_qos0 = 1,    //发布qos0
 
-    mosq_ms_publish_qos1 = 2,
+    mosq_ms_publish_qos1 = 2,    //发布qos1
 
     mosq_ms_wait_for_puback = 3,//Oos==1时，发送PUBLISH后等待PUBACK返回
 
-    mosq_ms_publish_qos2 = 4,
+    mosq_ms_publish_qos2 = 4,    //发布qos2
 
     mosq_ms_wait_for_pubrec = 5, //Oos==2时，发送PUBLISH后，等待PUBREC返回
 
-    mosq_ms_resend_pubrel = 6,
+    mosq_ms_resend_pubrel = 6,    //重发pubrel
 
     mosq_ms_wait_for_pubrel = 7, //Oos==2时，发送PUBREC后等待PUBREL返回
 
-    mosq_ms_resend_pubcomp = 8,
+    mosq_ms_resend_pubcomp = 8,    //重发pubcomp
 
     mosq_ms_wait_for_pubcomp = 9, //Oos==2时，发送PUBREL后等待PUBCOMP返回
 
-    mosq_ms_send_pubrec = 10,
+    mosq_ms_send_pubrec = 10,     //发布pubrec
 
-    mosq_ms_queued = 11
+    mosq_ms_queued = 11            //排队状态
 
+};
+```
+* 协议枚举值
+
+```c
+enum _mosquitto_protocol {
+	mosq_p_invalid = 0,
+	mosq_p_mqtt31 = 1,
+	mosq_p_mqtt311 = 2,
+	mosq_p_mqtts = 3
+}
+```
+
+* 传输协议枚举值
+
+```c
+enum _mosquitto_transport {
+	mosq_t_invalid = 0,
+	mosq_t_tcp = 1,
+	mosq_t_ws = 2,    //websockets
+	mosq_t_sctp = 3
 };
 ```
 * 数据包，发送的数据在组包之后，或者接收的数据在解包之前的状态
@@ -302,6 +349,8 @@ struct mosquitto {
 
   <br>
 <font color="red" size="5">代码详细注解待添加</font>  
+
+
 
 #memory_mosq模块
 * 内存分配处理，可记录内存用量
