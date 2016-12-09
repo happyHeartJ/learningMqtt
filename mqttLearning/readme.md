@@ -11,3 +11,5 @@ mosquitto的config.mk文件分析，mosquitto.conf文件文件，发布参数、
 mosquitto的client分析。分析了sub_client和pub_client源码
 ##6、[mosquitto.conf详细分析](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/mosquittoConfDetail.markdown)
 mosquitto.conf的详细配置说明
+##7、[libmosquitto.so源码文件说明](https://github.com/happyHeartJ/learningMqtt/blob/master/mqttLearning/aboutlibmosquitto.markdown)
+介绍mosquitto源码文件中，lib文件夹内的文件功能
